@@ -88,39 +88,76 @@ class GitHubCommentOutput:
         mr = result.merge_readiness
         lines: list[str] = []
 
+        # Header
         lines.append(BOT_SIGNATURE)
         lines.append("")
         lines.append(f"**{s.pr_type.upper() or 'REVIEW'}** — {s.overview or '审查完成'}")
 
+        # Summary
+        lines.append(f"")
+        lines.append(f"## 总结")
+        lines.append(f"")
+        lines.append(f"- **类型**: {s.pr_type or 'N/A'}")
+        lines.append(f"- **概述**: {s.overview or '无'}")
+        lines.append(f"- **文件变更**: {result.meta.files_analyzed} 个  |  发现: {len(result.findings)} 个")
+
+        # Merge Readiness
         if mr:
             score_icon = "✅" if mr.score >= 80 else "⚠️" if mr.score >= 50 else "🔴"
             lines.append(f"")
-            lines.append(f"### 合并就绪: {score_icon} {mr.score:.0f}/100 — {mr.recommendation.value}")
+            lines.append(f"## 合并就绪评估")
+            lines.append(f"")
+            lines.append(f"- **评分**: {score_icon} {mr.score:.0f}/100 — {mr.recommendation.value}")
             if mr.blocking_issues:
-                lines.append(f"")
-                lines.append("**阻断问题:**")
+                lines.append(f"- **阻断问题**: {len(mr.blocking_issues)} 个")
                 for bi in mr.blocking_issues:
-                    lines.append(f"- {bi}")
+                    lines.append(f"  - {bi}")
             if mr.summary:
-                lines.append(f"")
-                lines.append(mr.summary)
+                lines.append(f"- {mr.summary}")
 
+        # File Walkthrough
+        if result.file_walkthrough:
+            lines.append(f"")
+            lines.append(f"## 变更文件 ({len(result.file_walkthrough)})")
+            lines.append(f"")
+            lines.append("| 操作 | 文件 | 说明 |")
+            lines.append("|------|------|------|")
+            for fw in result.file_walkthrough:
+                lines.append(f"| {fw.edit_type.value} | `{fw.path}` | {fw.summary[:80]} |")
+
+        # Findings (full detail, same structure as markdown)
         if result.findings:
             lines.append(f"")
-            lines.append(f"### 发现 ({len(result.findings)})")
-            lines.append(f"")
-            lines.append("| # | 严重 | 类别 | 标题 | 文件 |")
-            lines.append("|---|------|------|------|------|")
-            for i, f in enumerate(result.findings[:20], 1):
+            lines.append(f"## 发现 ({len(result.findings)})")
+            for i, f in enumerate(result.findings, 1):
                 icon = _SEVERITY_ICON.get(f.severity, "")
-                lines.append(
-                    f"| {i} | {icon} {f.severity.value} | {f.category} | "
-                    f"{f.title[:40]} | `{f.location.path}:{f.location.range.start.line}` |"
-                )
-            if len(result.findings) > 20:
                 lines.append(f"")
-                lines.append(f"> 共 {len(result.findings)} 个发现，仅显示前 20 个。"
-                             f" 完整报告见 [Insightor 审查报告].")
+                lines.append(f"### {i}. {icon} [{f.severity.value}] {f.title}")
+                lines.append(f"")
+                lines.append(f"- **类别**: {f.category}")
+                lines.append(f"- **文件**: `{f.location.path}:{f.location.range.start.line}`")
+                if f.description:
+                    lines.append(f"- **说明**: {f.description}")
+                if f.suggestion:
+                    if f.suggestion.current_code:
+                        lines.append(f"- **当前代码**:")
+                        lines.append(f"  ```")
+                        lines.append(f"  {f.suggestion.current_code}")
+                        lines.append(f"  ```")
+                    if f.suggestion.suggested_code:
+                        lines.append(f"- **建议代码**:")
+                        lines.append(f"  ```")
+                        lines.append(f"  {f.suggestion.suggested_code}")
+                        lines.append(f"  ```")
+                if f.confidence:
+                    lines.append(f"- **置信度**: {f.confidence:.0%}")
+                if f.feedback and f.feedback.status is not None:
+                    feedback_status = f.feedback.status.value
+                    fb_map = {"confirmed": "已确认", "false_positive": "误报",
+                              "addressed": "已处理", "ignored": "忽略"}
+                    lines.append(f"- **反馈**: {fb_map.get(feedback_status, feedback_status)}")
+                    if f.feedback.reviewer_note:
+                        lines.append(f"  - 备注: {f.feedback.reviewer_note}")
 
         return "\n".join(lines)
 
