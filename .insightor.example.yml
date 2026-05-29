@@ -1,0 +1,38 @@
+# Insightor 项目级配置示例
+# 将此文件复制为 .insightor.yml 放在仓库根目录即可生效
+
+review:
+  min_severity: medium
+  max_findings: 15
+  focus_categories:
+    - security
+    - performance
+    - logic
+  custom_rules:
+    - "所有 /api/ 路由处理器必须有 @require_auth 装饰器"
+    - "数据库查询必须使用参数化查询，禁止字符串拼接 SQL"
+    - "金额计算必须使用 Decimal 而非 float"
+  conventions:
+    - "使用 async/await 而非回调"
+    - "错误消息使用中文"
+    - "日志使用 structlog 而非 print"
+  safe_patterns:
+    - "logger\\.debug\\(.*password.*\\)"
+    - "eval\\(json_data\\)"
+
+context:
+  dependency_map:
+    "src/models/": ["src/services/", "src/api/", "tests/"]
+    "src/middleware/": ["src/api/", "tests/"]
+  max_related_files: 5
+
+models:
+  primary: "claude-sonnet-4-6"
+  fallback:
+    - "deepseek-v3"
+    - "gpt-4o"
+
+output:
+  formats:
+    - console
+    - markdown
