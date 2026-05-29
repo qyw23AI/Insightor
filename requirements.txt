@@ -1,0 +1,11 @@
+# HTTP 请求
+requests>=2.31.0
+
+# 环境变量管理
+python-dotenv>=1.0.0
+
+# AI API
+anthropic>=0.18.0
+
+# 可选：OpenAI API（如果需要）
+# openai>=1.12.0
