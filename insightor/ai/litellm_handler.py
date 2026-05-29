@@ -82,15 +82,12 @@ class LiteLLMHandler:
             return AIResponse(finish_reason="error", duration_ms=int((time.time() - t0) * 1000))
 
         content = _extract_content(response)
+        usage = _extract_usage(response)
         return AIResponse(
             content=content,
             model=response.get("model", resolved),
             finish_reason=response.get("finish_reason", "stop"),
-            usage=TokenUsage(
-                prompt_tokens=response.get("usage", {}).get("prompt_tokens", 0),
-                completion_tokens=response.get("usage", {}).get("completion_tokens", 0),
-                total_tokens=response.get("usage", {}).get("total_tokens", 0),
-            ),
+            usage=usage,
             duration_ms=int((time.time() - t0) * 1000),
         )
 
@@ -192,15 +189,12 @@ class LiteLLMHandler:
                     stream=False,
                 )
                 content = _extract_content(response)
+                usage = _extract_usage(response)
                 return AIResponse(
                     content=content,
                     model=response.get("model", resolved),
                     finish_reason=response.get("finish_reason", "stop"),
-                    usage=TokenUsage(
-                        prompt_tokens=response.get("usage", {}).get("prompt_tokens", 0),
-                        completion_tokens=response.get("usage", {}).get("completion_tokens", 0),
-                        total_tokens=response.get("usage", {}).get("total_tokens", 0),
-                    ),
+                    usage=usage,
                     duration_ms=int((time.time() - t0) * 1000),
                 )
             except Exception as e:
@@ -237,6 +231,27 @@ class LiteLLMHandler:
             msgs.append({"role": "system", "content": system_prompt})
         msgs.append({"role": "user", "content": user_prompt})
         return msgs
+
+
+def _extract_usage(response) -> "TokenUsage":
+    """从 litellm 响应中提取 token 用量。"""
+    # 1. dict 路径
+    if isinstance(response, dict):
+        u = response.get("usage", {})
+        if u:
+            return TokenUsage(
+                prompt_tokens=u.get("prompt_tokens", 0) or 0,
+                completion_tokens=u.get("completion_tokens", 0) or 0,
+                total_tokens=u.get("total_tokens", 0) or 0,
+            )
+    # 2. 对象属性路径
+    if hasattr(response, "usage") and response.usage:
+        return TokenUsage(
+            prompt_tokens=getattr(response.usage, "prompt_tokens", 0) or 0,
+            completion_tokens=getattr(response.usage, "completion_tokens", 0) or 0,
+            total_tokens=getattr(response.usage, "total_tokens", 0) or 0,
+        )
+    return TokenUsage()
 
 
 def _extract_content(response) -> str:

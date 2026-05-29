@@ -90,8 +90,6 @@ class ResponseParser:
             summary=overall.get("summary", ""),
         )
 
-        meta.tokens_used = data.get("_tokens_used", 0)
-
         return ReviewResult(
             meta=meta,
             summary=summary,
