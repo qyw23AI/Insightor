@@ -13,7 +13,7 @@ from typing import Callable, Optional
 
 from insightor.ai.litellm_handler import LiteLLMHandler
 from insightor.ai.prompt_builder import PromptBuilder
-from insightor.ai.response_parser import ResponseParser, DescribeParser
+from insightor.ai.response_parser import ResponseParser, DescribeParser, RisksParser
 from insightor.config.loader import config
 from insightor.processing.cache_manager import CacheManager
 from insightor.processing.diff_compressor import DiffCompressor
@@ -150,7 +150,12 @@ class ReviewPipeline:
             is_incremental=incremental,
             context_layers=["diff"],
         )
-        result = DescribeParser.parse(resp.content, meta) if tool == "describe" else ResponseParser.parse(resp.content, meta)
+        if tool == "describe":
+            result = DescribeParser.parse(resp.content, meta)
+        elif tool == "risks":
+            result = RisksParser.parse(resp.content, meta)
+        else:
+            result = ResponseParser.parse(resp.content, meta)
 
         # Step 7: 缓存结果
         self._progress(on_progress, "正在保存结果...")
@@ -159,6 +164,8 @@ class ReviewPipeline:
 
         if tool == "describe":
             self._progress(on_progress, f"分析完成 ({len(result.file_walkthrough)} 个文件)")
+        elif tool == "risks":
+            self._progress(on_progress, f"风险分析完成 ({len(result.findings)} 个发现)")
         else:
             self._progress(on_progress, f"分析完成 ({len(result.findings)} 个发现)")
         return result

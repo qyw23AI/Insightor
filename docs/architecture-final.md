@@ -880,30 +880,54 @@ class ReviewPipeline:
 
 #### PR #8：风险代码识别工具 (/risks) + Merge Readiness
 
-**标题**：实现风险代码识别与合并就绪评估
+**标题**：实现风险代码识别与合并就绪评估——自动计算阻断问题与审查优先级
 
 **功能描述**：
-AI 识别安全/并发/性能/逻辑/数据丢失风险。**新增**：自动计算 MergeReadiness——综合风险评分、阻断问题列表、审查优先级、预估人工审查时间。
-
-**关键新增（vs V2）**：
-- `MergeReadinessCalc.calculate(findings, stats)` → MergeReadiness
-- 阻断规则：critical risk = blocked；3+ high risks = blocked
-- 审查优先级：critical presence → high；>10 files → medium；else → low
+AI 聚焦安全/并发/性能/逻辑/数据丢失风险进行审查。**新增**：`MergeReadinessCalc` 自动从 findings 计算 MergeReadiness；`RisksParser` 解析 risks 工具输出，AI 未提供 overall 评分时采用 fallback 计算。
 
 **涉及接口**：
 
 ```python
-class RiskTool:
-    async def run(self, pr_url, depth, min_severity, focus_categories) -> ReviewResult: ...
+# ===== 新增 MergeReadinessCalc =====
+class MergeReadinessCalc:
+    """独立工具：从 findings 计算 MergeReadiness。AI 未提供 overall 时的 fallback。"""
+    @staticmethod
+    def calculate(
+        findings: list[Finding],
+        files_changed: int = 0,
+    ) -> MergeReadiness:
+        # score = clamp(100 - Σ(sev*weight), 0, 100)
+        #   critical:-30, high:-10, medium:-3, low:-1
+        # blocking_issues = 所有 critical + (h>=3 ? 所有 high : 无)
+        # review_priority = critical→high, high|files>10→medium, else→low
+        # estimated_review_time_min = len(findings) * 2
+        # summary 自动生成中文描述
 
-class MergeReadinessCalc:  # ★ v3 新增
-    def calculate(self, findings: list[Finding], stats: ReviewStats) -> MergeReadiness:
-        score = 100
-        score -= sum({critical:30, high:10, medium:3, low:1}[f.severity] for f in findings)
-        score += (stats.quality.test_files_in_diff > 0) * 15
-        score -= stats.file_walkthrough.__len__() * 0.5
-        return MergeReadiness(score=max(0, min(100, score)), ...)
+# ===== 新增 RisksParser =====
+class RisksParser:
+    """解析 risks AI 响应 JSON → ReviewResult。"""
+    @staticmethod
+    def parse(raw: str, meta: ReviewMeta) -> ReviewResult: ...
+    @staticmethod
+    def from_dict(data: dict, meta: ReviewMeta) -> ReviewResult:
+        # findings → _parse_finding()
+        # overall 存在 → AI 提供值
+        # overall 缺失 → MergeReadinessCalc.calculate() fallback
 ```
+
+**关键新增**：
+- `MergeReadinessCalc`：独立工具类，从 findings 计算 MergeReadiness（score、blocking_issues、review_priority、estimated_review_time_min）
+- `RisksParser`：处理 risks 输出，AI 提供 overall 时直接使用，否则 fallback 到 MergeReadinessCalc
+- `_parse_priority()`：字符串 → ReviewPriority 枚举
+- Pipeline 增加 `tool=="risks"` 分支分发到 RisksParser
+- `scripts/risks.py`：CLI 入口，支持 `--debug`/`--depth`/`--focus`
+- `insightor/config/prompts/risks.toml`：增强 prompt，增加 overall 评分输出和评分规则
+
+**测试方式**：
+- 12 个 MergeReadinessCalc 单元测试（no_findings、critical_only、blocks、high_threshold、score_clamping、review_priority、estimated_time）
+- 8 个 RisksParser 单元测试（with_overall、missing_overall、empty、findings_mapped、parse_raw）
+- 1 个 pipeline risks 路由测试
+- 端到端：`python scripts/risks.py <PR_URL> --focus security`
 
 ---
 
