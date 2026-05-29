@@ -3,7 +3,7 @@
 import pytest
 
 from insightor.ai.prompt_builder import PromptBuilder
-from insightor.ai.response_parser import ResponseParser, _extract_json
+from insightor.ai.response_parser import ResponseParser, DescribeParser, _extract_json
 from insightor.schemas.urf import ReviewMeta, MergeRecommendation
 
 
@@ -139,3 +139,87 @@ class TestResponseParser:
         raw = '{"summary": {"pr_type": "bugfix", "overview": "修复了崩溃"}}'
         result = ResponseParser.parse(raw, meta)
         assert result.summary.pr_type == "bugfix"
+
+
+# =============================================================================
+# DescribeParser
+# =============================================================================
+
+class TestDescribeParser:
+    @pytest.fixture
+    def meta(self):
+        return ReviewMeta(pr_url="https://github.com/a/b/pull/1", files_analyzed=3)
+
+    def test_from_dict_basic(self, meta):
+        data = {"pr_type": "feature", "overview": "添加用户认证模块"}
+        result = DescribeParser.from_dict(data, meta)
+        assert result.summary.pr_type == "feature"
+        assert result.summary.overview == "添加用户认证模块"
+        assert result.summary.diagram == ""
+        assert result.file_walkthrough == []
+        assert result.findings == []
+
+    def test_from_dict_full_with_diagram(self, meta):
+        data = {
+            "pr_type": "feature",
+            "overview": "添加 JWT 登录与刷新功能",
+            "files": [
+                {"path": "src/auth/login.py", "change": "添加 JWT token 生成"},
+                {"path": "src/auth/refresh.py", "change": "添加 token 刷新逻辑"},
+            ],
+            "diagram": "flowchart TD\n  Login-->JWT-->Refresh",
+        }
+        result = DescribeParser.from_dict(data, meta)
+        assert result.summary.pr_type == "feature"
+        assert "JWT" in result.summary.overview
+        assert "flowchart TD" in result.summary.diagram
+        assert len(result.file_walkthrough) == 2
+        assert result.file_walkthrough[0].path == "src/auth/login.py"
+        assert result.file_walkthrough[0].summary == "添加 JWT token 生成"
+        assert result.findings == []
+        assert result.merge_readiness is None
+
+    def test_from_dict_empty(self, meta):
+        result = DescribeParser.from_dict({}, meta)
+        assert result.summary.pr_type == ""
+        assert result.summary.overview == ""
+        assert result.summary.diagram == ""
+        assert result.file_walkthrough == []
+
+    def test_from_dict_with_files(self, meta):
+        data = {
+            "files": [
+                {"path": "a.py", "change": "重构登录逻辑"},
+                {"path": "tests/test_b.py", "change": "新增 session 测试"},
+            ],
+        }
+        result = DescribeParser.from_dict(data, meta)
+        assert len(result.file_walkthrough) == 2
+        assert result.file_walkthrough[1].path == "tests/test_b.py"
+
+    def test_from_dict_files_edit_type(self, meta):
+        data = {
+            "files": [
+                {"path": "new.py", "change": "add login module"},
+                {"path": "old.py", "change": "delete deprecated code"},
+                {"path": "moved.py", "change": "rename module"},
+            ],
+        }
+        result = DescribeParser.from_dict(data, meta)
+        assert result.file_walkthrough[0].edit_type.value == "added"
+        assert result.file_walkthrough[1].edit_type.value == "deleted"
+        assert result.file_walkthrough[2].edit_type.value == "renamed"
+
+    def test_parse_raw(self, meta):
+        raw = '{"pr_type": "docs", "overview": "更新 README"}'
+        result = DescribeParser.parse(raw, meta)
+        assert result.summary.pr_type == "docs"
+        assert result.summary.overview == "更新 README"
+
+    def test_parse_returns_review_result(self, meta):
+        raw = '{"pr_type": "refactor"}'
+        result = DescribeParser.parse(raw, meta)
+        assert result.meta == meta
+        assert result.summary.pr_type == "refactor"
+        assert result.file_walkthrough == []
+        assert result.findings == []

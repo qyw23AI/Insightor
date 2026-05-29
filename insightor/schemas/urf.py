@@ -131,6 +131,7 @@ class PRSummary(BaseModel):
     files_changed: int = 0
     additions: int = 0
     deletions: int = 0
+    diagram: str = Field(default="", description="Mermaid 流程图代码，无则为空字符串")
 
 
 class FileWalkthrough(BaseModel):

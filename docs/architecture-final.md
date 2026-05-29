@@ -821,9 +821,56 @@ class ReviewPipeline:
 
 #### PR #7：PR 变更总结工具 (/describe)
 
-*(与 V2 一致，受益于上下文管线自动获得更多上下文)*
-
 **标题**：实现 PR 变更总结功能——自动生成 PR 描述与文件变更走览
+
+**功能描述**：
+自动分析 PR 代码变更，生成结构化总结：PR 类型分类、一句话概述、逐文件变更说明、可选 Mermaid 组件交互流程图。管线根据 `tool` 参数自动分发对应的解析器。
+
+**涉及接口**：
+
+```python
+# ===== 新增 Schema 字段 =====
+class PRSummary(BaseModel):
+    pr_type: str
+    overview: str
+    files_changed: int
+    additions: int
+    deletions: int
+    diagram: str = Field(default="", description="Mermaid 流程图代码")  # ★ 新增
+
+# ===== 新增 DescribeParser =====
+class DescribeParser:
+    """将 describe 工具的 AI 响应解析为 ReviewResult。"""
+    @staticmethod
+    def parse(raw: str, meta: ReviewMeta) -> ReviewResult: ...
+        # 调用 _extract_json(raw) → from_dict(data, meta)
+
+    @staticmethod
+    def from_dict(data: dict, meta: ReviewMeta) -> ReviewResult:
+        # pr_type, overview, diagram → PRSummary
+        # files[{path, change}] → list[FileWalkthrough]
+        # 复用 _str_to_edit_type() 从 change 文本推断 EditType
+
+# ===== Pipeline 工具感知改造 =====
+class ReviewPipeline:
+    async def run(self, pr_url, tool="review", depth="standard", ...) -> ReviewResult:
+        # Step 4: 注入 file_list 到 prompt vars (describe/risks 模板使用)
+        # Step 6: DescribeParser.parse() when tool=="describe" else ResponseParser.parse()
+        # 进度消息按工具区分 (describe 显示文件数，review 显示发现数)
+```
+
+**关键新增**：
+- `DescribeParser`：解析 describe 输出 JSON（`pr_type`、`overview`、`files[{path, change}]`、`diagram`）→ `ReviewResult`
+- `PRSummary.diagram`：存储 Mermaid 流程图代码（无则空字符串）
+- Pipeline 工具感知：根据 `tool` 分发 DescribeParser/ResponseParser
+- Pipeline 新增 `file_list` 变量注入（所有模板可用）
+- `scripts/describe.py`：CLI 入口，支持 `--debug`/`--depth`
+- `insightor/config/prompts/describe.toml`：完善 prompt，含 PR 类型分类规则、文件说明要求、Mermaid 生成规则
+
+**测试方式**：
+- 7 个 DescribeParser 单元测试（basic、full_with_diagram、empty、files、edit_type、parse_raw、returns_review_result）
+- 1 个 pipeline 分发测试
+- 端到端：`python scripts/describe.py <PR_URL>` 对比 AI 输出与预期
 
 ---
 
