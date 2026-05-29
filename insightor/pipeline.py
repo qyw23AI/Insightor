@@ -15,6 +15,10 @@ from insightor.ai.litellm_handler import LiteLLMHandler
 from insightor.ai.prompt_builder import PromptBuilder
 from insightor.ai.response_parser import ResponseParser, DescribeParser, RisksParser, ImproveParser
 from insightor.config.loader import config
+from insightor.output.base import CompositeOutput
+from insightor.output.console import ConsoleOutput
+from insightor.output.json_output import JSONOutput
+from insightor.output.markdown import MarkdownFileOutput
 from insightor.processing.cache_manager import CacheManager
 from insightor.processing.diff_compressor import DiffCompressor
 from insightor.processing.file_filter import FileFilter
@@ -134,10 +138,10 @@ class ReviewPipeline:
             system_prompt=system,
             user_prompt=user,
             temperature=0.3,
-            max_tokens=4096 if depth_enum == AnalysisDepth.DEEP else 2048,
+            max_tokens=16384 if depth_enum == AnalysisDepth.DEEP else 8192,
         )
         # Step 6: 解析结果
-        self._progress(on_progress, "正在解析分析结果...")
+        self._progress(on_progress, f"正在解析分析结果... (finish={resp.finish_reason}, completion={resp.usage.completion_tokens}tok)")
         meta = ReviewMeta(
             pr_url=pr_url,
             commit_sha=info.commit_sha,
@@ -163,6 +167,16 @@ class ReviewPipeline:
         self._progress(on_progress, "正在保存结果...")
         cm = CacheManager(cache_root=self.cache_dir)
         cm.put(pr_url, info.commit_sha, result)
+
+        # Step 8: 输出结果
+        self._progress(on_progress, "正在输出结果...")
+        output = CompositeOutput([
+            ConsoleOutput(),
+            MarkdownFileOutput(),
+            JSONOutput(),
+        ])
+        output.post(result)
+        output.flush()
 
         if tool == "describe":
             self._progress(on_progress, f"分析完成 ({len(result.file_walkthrough)} 个文件)")

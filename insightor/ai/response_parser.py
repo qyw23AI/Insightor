@@ -406,34 +406,97 @@ class ImproveParser:
 # =============================================================================
 
 def _extract_json(raw: str) -> dict:
-    """从 LLM 原始响应中提取 JSON。"""
+    """从 LLM 原始响应中提取 JSON，支持截断修复。"""
     raw = raw.strip()
 
-    # 1. 尝试直接解析
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
-        pass
+    def _try_parse(text: str) -> dict | None:
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            return None
 
-    # 2. 提取 ```json ... ``` 包裹的内容
+    # 1. 直接解析
+    result = _try_parse(raw)
+    if result is not None:
+        return result
+
+    # 2. ```json ... ``` 包裹
     m = re.search(r"```(?:json)?\s*\n?(.*?)\n?```", raw, re.DOTALL)
     if m:
-        try:
-            return json.loads(m.group(1))
-        except json.JSONDecodeError:
-            pass
+        result = _try_parse(m.group(1))
+        if result is not None:
+            return result
 
-    # 3. 从第一个 { 到最后一个 } 提取
+    # 3. 截断修复 (优先于简单提取——修复可能恢复完整 JSON)
     start = raw.find("{")
+    if start >= 0:
+        repaired = _repair_truncated_json(raw[start:])
+        if repaired:
+            result = _try_parse(repaired)
+            if result is not None and result.get("findings"):
+                logger.warning("JSON 被截断，已修复 (%d findings)", len(result.get("findings", [])))
+                return result
+
+    # 4. 从第一个 { 到最后一个 } 提取 (兜底)
     end = raw.rfind("}")
     if start >= 0 and end > start:
-        try:
-            return json.loads(raw[start:end + 1])
-        except json.JSONDecodeError:
-            pass
+        result = _try_parse(raw[start:end + 1])
+        if result is not None:
+            return result
 
-    logger.warning("无法从响应中提取 JSON, 返回空结果")
+    # 5. 修复后再尝试 (修复可能因无 findings 被跳过)
+    if start >= 0:
+        repaired = _repair_truncated_json(raw[start:])
+        if repaired:
+            result = _try_parse(repaired)
+            if result is not None:
+                logger.warning("JSON 被截断，部分解析 (无 findings)")
+                return result
+
+    logger.warning(
+        "无法从响应中提取 JSON (len=%d), 前200字: %s",
+        len(raw), raw[:200],
+    )
     return {}
+
+
+def _repair_truncated_json(text: str) -> str | None:
+    """尝试修复被截断的 JSON: 闭合未完成字符串并补齐括号。"""
+    text = text.rstrip()
+
+    # 1. 检测是否在未闭合字符串内 — 追加引号闭合
+    in_string = False
+    for i, ch in enumerate(text):
+        if ch == '"' and (i == 0 or text[i - 1] != '\\'):
+            in_string = not in_string
+    if in_string:
+        text += '"'
+
+    # 2. 栈追踪括号嵌套顺序
+    stack: list[str] = []
+    in_string = False
+    for i, ch in enumerate(text):
+        if ch == '"' and (i == 0 or text[i - 1] != '\\'):
+            in_string = not in_string
+        elif not in_string:
+            if ch == '{':
+                stack.append('}')
+            elif ch == '}':
+                if stack and stack[-1] == '}':
+                    stack.pop()
+            elif ch == '[':
+                stack.append(']')
+            elif ch == ']':
+                if stack and stack[-1] == ']':
+                    stack.pop()
+
+    if not stack:
+        return None
+
+    # 3. 按栈的逆序补齐括号
+    text = text.rstrip().rstrip(',')
+    text += ''.join(reversed(stack))
+    return text
 
 
 def _parse_finding(item: dict) -> Finding:

@@ -78,7 +78,7 @@ async def main():
         model_name = "deepseek-v4-flash"
         resp = await handler.chat_completion(
             model=model_name, system_prompt=sys_p, user_prompt=usr_p,
-            temperature=0.3, max_tokens=4096,
+            temperature=0.3, max_tokens=8192,
         )
         print(f"\n[5] LLM: {resp.model} {resp.duration_ms}ms")
         print(f"    usage: prompt={resp.usage.prompt_tokens} completion={resp.usage.completion_tokens} total={resp.usage.total_tokens}")
@@ -101,24 +101,14 @@ async def main():
 
     result = await pipeline.run(pr_url=pr_url, tool=tool, depth=depth, on_progress=progress)
 
-    print(f"\n{'='*60}")
-    print(f"  {result.summary.pr_type.upper()} | {result.summary.overview}")
-    print(f"{'='*60}\n")
-
-    if result.findings:
-        print(f"发现 ({result.stats.total_findings}):")
-        for f in result.findings:
-            icon = {"critical": "!!", "high": "! ", "medium": "· ", "low": "  "}.get(f.severity.value, "  ")
-            print(f"  {icon} [{f.severity.value:8}] [{f.category:12}] {f.title}")
-            print(f"      {f.location.path}:{f.location.range.start.line}  (置信度: {f.confidence:.0%})")
+    # pipeline 已通过 CompositeOutput 输出终端/Markdown/JSON
+    mr = result.merge_readiness
+    if mr:
+        status = "✅" if mr.score >= 80 else "⚠️" if mr.score >= 50 else "🔴"
+        print(f"\n{status} 完成: {mr.score:.0f}/100 [{mr.recommendation.value}]  "
+              f"{len(result.findings)} 发现  {result.meta.duration_ms}ms  {result.meta.model}")
     else:
-        print("未发现明显问题。")
-
-    if result.merge_readiness:
-        mr = result.merge_readiness
-        print(f"\n合并建议: {mr.recommendation.value} (评分: {mr.score:.0f}/100)")
-
-    print(f"\n耗时: {result.meta.duration_ms}ms | Token: {result.meta.tokens_used} | 模型: {result.meta.model}")
+        print(f"\n完成: {result.meta.duration_ms}ms | {result.meta.model}")
 
 
 if __name__ == "__main__":

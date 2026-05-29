@@ -84,7 +84,7 @@ async def main():
         handler = LiteLLMHandler(fallback_models=["deepseek-v4-flash"])
         resp = await handler.chat_completion(
             model="deepseek-v4-flash", system_prompt=sys_p, user_prompt=usr_p,
-            temperature=0.3, max_tokens=4096,
+            temperature=0.3, max_tokens=8192,
         )
         print(f"\n[5] LLM: {resp.model} {resp.duration_ms}ms")
         print(f"    usage: prompt={resp.usage.prompt_tokens} completion={resp.usage.completion_tokens} total={resp.usage.total_tokens}")
