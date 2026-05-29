@@ -13,7 +13,7 @@ from typing import Callable, Optional
 
 from insightor.ai.litellm_handler import LiteLLMHandler
 from insightor.ai.prompt_builder import PromptBuilder
-from insightor.ai.response_parser import ResponseParser, DescribeParser, RisksParser
+from insightor.ai.response_parser import ResponseParser, DescribeParser, RisksParser, ImproveParser
 from insightor.config.loader import config
 from insightor.processing.cache_manager import CacheManager
 from insightor.processing.diff_compressor import DiffCompressor
@@ -154,6 +154,8 @@ class ReviewPipeline:
             result = DescribeParser.parse(resp.content, meta)
         elif tool == "risks":
             result = RisksParser.parse(resp.content, meta)
+        elif tool == "improve":
+            result = ImproveParser.parse(resp.content, meta)
         else:
             result = ResponseParser.parse(resp.content, meta)
 
@@ -166,6 +168,8 @@ class ReviewPipeline:
             self._progress(on_progress, f"分析完成 ({len(result.file_walkthrough)} 个文件)")
         elif tool == "risks":
             self._progress(on_progress, f"风险分析完成 ({len(result.findings)} 个发现)")
+        elif tool == "improve":
+            self._progress(on_progress, f"代码建议分析完成 ({len(result.findings)} 个建议)")
         else:
             self._progress(on_progress, f"分析完成 ({len(result.findings)} 个发现)")
         return result

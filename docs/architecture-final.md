@@ -933,9 +933,41 @@ class RisksParser:
 
 #### PR #9：Review 建议生成工具 (/improve)
 
-*(与 V2 一致，deep 模式增加自反思校验)*
-
 **标题**：实现 Review 建议智能生成——代码质量、最佳实践与可应用代码修补建议
+
+**功能描述**：
+自动分析 PR 代码变更，生成可应用的代码改进建议。聚焦代码可维护性、性能优化、设计模式、错误处理。每个建议提供 `current_code`/`suggested_code` 对比和 `is_committable` 标记。
+
+**涉及接口**：
+
+```python
+# ===== 新增 ImproveParser =====
+class ImproveParser:
+    """将 AI 代码建议 JSON 解析为 ReviewResult。"""
+    @staticmethod
+    def parse(raw: str, meta: ReviewMeta) -> ReviewResult: ...
+    @staticmethod
+    def from_dict(data: dict, meta: ReviewMeta) -> ReviewResult:
+        # 兼容 suggestions / findings 两种 key
+        # 解析 current_code/suggested_code → CodeSuggestion(is_committable)
+        # 兼容旧格式: suggestion 为纯文本字符串
+        # overall 存在 → AI 提供值
+        # overall 缺失 → MergeReadinessCalc.calculate() fallback
+        # 构建 PRSummary, file_walkthrough, stats
+```
+
+**关键新增**：
+- `ImproveParser`：解析 improve 输出 JSON（`suggestions[{current_code, suggested_code, is_committable}]`）→ `ReviewResult`
+- 兼容 `findings` key（与 review.toml 格式兼容）
+- 兼容纯文本 `suggestion` 字段（向后兼容旧格式）
+- Pipeline 增加 `tool=="improve"` 分支分发到 ImproveParser
+- `scripts/improve.py`：CLI 入口，支持 `--debug`/`--depth`
+- `insightor/config/prompts/improve.toml`：完善 prompt，含代码质量检查规则、建议输出格式、评分规则
+
+**测试方式**：
+- 7 个 ImproveParser 单元测试（basic、findings_fallback、empty、missing_overall、text_suggestion、files、parse_raw）
+- 1 个 pipeline 分发测试
+- 端到端：`python scripts/improve.py <PR_URL> --debug`
 
 ---
 

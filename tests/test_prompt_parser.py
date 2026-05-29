@@ -4,7 +4,7 @@ import pytest
 
 from insightor.ai.prompt_builder import PromptBuilder
 from insightor.ai.response_parser import (
-    ResponseParser, DescribeParser, RisksParser,
+    ResponseParser, DescribeParser, RisksParser, ImproveParser,
     MergeReadinessCalc, _extract_json,
 )
 from insightor.schemas.urf import (
@@ -420,3 +420,144 @@ class TestRisksParser:
     def test_no_files_in_data(self, meta):
         result = RisksParser.from_dict({"findings": []}, meta)
         assert result.file_walkthrough == []
+
+
+# =============================================================================
+# ImproveParser
+# =============================================================================
+
+class TestImproveParser:
+    @pytest.fixture
+    def meta(self):
+        return ReviewMeta(pr_url="https://github.com/a/b/pull/1", files_analyzed=3)
+
+    def test_from_dict_basic(self, meta):
+        data = {
+            "summary": {"pr_type": "refactor", "overview": "整体代码质量良好"},
+            "suggestions": [
+                {
+                    "type": "suggestion",
+                    "severity": "medium",
+                    "category": "maintainability",
+                    "title": "提取重复逻辑",
+                    "description": "多处存在相同的验证逻辑",
+                    "file": "src/utils.py",
+                    "line_start": 42,
+                    "line_end": 56,
+                    "current_code": "if x > 0:\n    return x\nreturn 0",
+                    "suggested_code": "return max(x, 0)",
+                    "is_committable": True,
+                    "confidence": 0.9,
+                },
+            ],
+            "overall": {"score": 75, "summary": "有改进空间"},
+        }
+        result = ImproveParser.from_dict(data, meta)
+        assert result.summary.pr_type == "refactor"
+        assert result.summary.overview == "整体代码质量良好"
+        assert len(result.findings) == 1
+        f = result.findings[0]
+        assert f.type.value == "suggestion"
+        assert f.severity.value == "medium"
+        assert f.category == "maintainability"
+        assert f.title == "提取重复逻辑"
+        assert f.location.path == "src/utils.py"
+        assert f.suggestion is not None
+        assert f.suggestion.current_code == "if x > 0:\n    return x\nreturn 0"
+        assert f.suggestion.suggested_code == "return max(x, 0)"
+        assert f.suggestion.is_committable is True
+        assert f.confidence == 0.9
+        assert result.merge_readiness is not None
+        assert result.merge_readiness.score == 75.0
+
+    def test_from_dict_uses_findings_fallback(self, meta):
+        """兼容 findings key 而非 suggestions。"""
+        data = {
+            "findings": [
+                {
+                    "severity": "low",
+                    "category": "performance",
+                    "title": "使用列表推导式",
+                    "file": "loop.py",
+                    "line_start": 10,
+                    "line_end": 10,
+                    "confidence": 0.7,
+                },
+            ],
+        }
+        result = ImproveParser.from_dict(data, meta)
+        assert len(result.findings) == 1
+        assert result.findings[0].type.value == "suggestion"
+
+    def test_from_dict_empty(self, meta):
+        result = ImproveParser.from_dict({}, meta)
+        assert result.findings == []
+        assert result.summary.pr_type == ""
+        assert result.merge_readiness is not None
+        assert result.merge_readiness.score == 100.0
+
+    def test_from_dict_missing_overall(self, meta):
+        data = {
+            "suggestions": [
+                {
+                    "severity": "high",
+                    "category": "reliability",
+                    "title": "缺少异常处理",
+                    "file": "api.py",
+                    "line_start": 20,
+                    "line_end": 20,
+                    "confidence": 0.8,
+                },
+            ],
+        }
+        result = ImproveParser.from_dict(data, meta)
+        assert len(result.findings) == 1
+        assert result.merge_readiness is not None
+        assert result.merge_readiness.score == 90.0  # 100 - 10
+
+    def test_from_dict_with_text_suggestion(self, meta):
+        """旧格式: suggestion 是纯文本字符串。"""
+        data = {
+            "suggestions": [
+                {
+                    "severity": "low",
+                    "category": "style",
+                    "title": "变量命名",
+                    "file": "x.py",
+                    "line_start": 1,
+                    "line_end": 1,
+                    "suggestion": "将变量 a 改为 user_count",
+                    "confidence": 0.5,
+                },
+            ],
+        }
+        result = ImproveParser.from_dict(data, meta)
+        assert len(result.findings) == 1
+        assert result.findings[0].suggestion is not None
+        assert result.findings[0].suggestion.suggested_code == "将变量 a 改为 user_count"
+
+    def test_from_dict_with_files(self, meta):
+        data = {
+            "suggestions": [],
+            "files": [
+                {"path": "src/app.py", "change": "重构入口逻辑"},
+            ],
+        }
+        result = ImproveParser.from_dict(data, meta)
+        assert len(result.file_walkthrough) == 1
+        assert result.file_walkthrough[0].path == "src/app.py"
+
+    def test_parse_raw(self, meta):
+        raw = (
+            '{"summary": {"pr_type": "feature", "overview": "不错的实现"},'
+            '"suggestions": [{"severity": "high", "category": "performance",'
+            '"title": "缓存计算结果", "file": "calc.py", "line_start": 5, "line_end": 5,'
+            '"current_code": "result = expensive(x)",'
+            '"suggested_code": "result = cache.get(x) or expensive(x)",'
+            '"is_committable": true, "confidence": 0.88}],'
+            '"overall": {"score": 85}}'
+        )
+        result = ImproveParser.parse(raw, meta)
+        assert len(result.findings) == 1
+        assert result.findings[0].suggestion.is_committable is True
+        assert result.merge_readiness.score == 85.0
