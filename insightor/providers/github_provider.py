@@ -165,20 +165,18 @@ class GitHubProvider:
     def get_diff(self, pr_url: str) -> bytes:
         """获取 PR 的完整 unified diff。
 
-        优先使用 PyGithub 的 diff 属性（复用已有认证连接），
-        失败时尝试 raw diff URL。
+        从 get_files() 的每个文件 patch 拼接，不额外调用 API。
         """
-        owner, repo, pr_number = parse_pr_url(pr_url)
-        r = self._client.get_repo(f"{owner}/{repo}")
-        pr = r.get_pull(pr_number)
-        # PyGithub PullRequest 的 diff 属性直接返回 unified diff 文本
-        try:
-            diff_text = pr.diff if hasattr(pr, "diff") else ""
-            if diff_text:
-                return diff_text.encode("utf-8")
-        except Exception:
-            pass
-        return b""
+        files = self.get_files(pr_url)
+        parts: list[str] = []
+        for f in files:
+            if not f.patch:
+                continue
+            header = f"diff --git a/{f.filename} b/{f.filename}"
+            if f.edit_type == EditType.RENAMED and f.old_filename:
+                header += f"\nrename from {f.old_filename}\nrename to {f.filename}"
+            parts.append(header + "\n" + f.patch)
+        return "\n".join(parts).encode("utf-8")
 
     @staticmethod
     def get_strip() -> int:
