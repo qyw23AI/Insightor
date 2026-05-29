@@ -1,68 +1,136 @@
-import requests
-import sys
-from dotenv import load_dotenv
 import os
+import requests
+from dotenv import load_dotenv
 
-load_dotenv()  # 自动加载 .env
+# 加载环境变量
+load_dotenv()
 
-# ===== 配置信息 =====
+# 从环境变量读取配置
+TOKEN = os.getenv("GITHUB_TOKEN")
 OWNER = os.getenv("OWNER", "qyw23AI")
 REPO = os.getenv("REPO", "Insightor")
 PR_NUMBER = int(os.getenv("PR_NUMBER", "1"))
-TOKEN = os.getenv("GITHUB_TOKEN")
-# ===================
 
-if not TOKEN:
-    print("❌ 错误: 请在 .env 文件中设置 GITHUB_TOKEN")
-    print("在 fetch_pr/.env 文件中添加:")
-    print("GITHUB_TOKEN=your_github_token_here")
-    sys.exit(1)
 
-url = f"https://api.github.com/repos/{OWNER}/{REPO}/pulls/{PR_NUMBER}/files"
+def get_pr_info(owner: str, repo: str, pr_number: int, token: str = None) -> dict:
+    """
+    获取指定 PR 的基本信息
 
-headers = {
-    "Authorization": f"Bearer {TOKEN}",
-    "Accept": "application/vnd.github+json",
-    "X-GitHub-Api-Version": "2022-11-28"
-}
+    Args:
+        owner: 仓库所有者
+        repo: 仓库名称
+        pr_number: PR 编号
+        token: GitHub token（可选，默认使用环境变量）
 
-try:
+    Returns:
+        包含 PR 信息的字典
+    """
+    if token is None:
+        token = TOKEN
+
+    if not token:
+        raise ValueError("请设置 GITHUB_TOKEN 环境变量或传入 token 参数")
+
+    url = f"https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}"
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+
     response = requests.get(url, headers=headers)
-    response.raise_for_status()
 
-    files = response.json()
+    if response.status_code == 200:
+        return response.json()
+    else:
+        raise Exception(f"获取 PR 信息失败: {response.status_code} - {response.text}")
 
-    print(f"\n📋 PR #{PR_NUMBER} 的文件变更 ({OWNER}/{REPO})")
-    print(f"共 {len(files)} 个文件\n")
+
+def get_pr_files(owner: str, repo: str, pr_number: int, token: str = None) -> list:
+    """
+    获取指定 PR 的文件变更列表
+
+    Args:
+        owner: 仓库所有者
+        repo: 仓库名称
+        pr_number: PR 编号
+        token: GitHub token（可选，默认使用环境变量）
+
+    Returns:
+        包含文件变更信息的列表
+    """
+    if token is None:
+        token = TOKEN
+
+    if not token:
+        raise ValueError("请设置 GITHUB_TOKEN 环境变量或传入 token 参数")
+
+    url = f"https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}/files"
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+
+    response = requests.get(url, headers=headers)
+
+    if response.status_code == 200:
+        return response.json()
+    else:
+        raise Exception(f"获取 PR 文件列表失败: {response.status_code} - {response.text}")
+
+
+def print_pr_info(pr_info: dict):
+    """打印 PR 基本信息"""
+    print("\n=== PR 基本信息 ===")
+    print(f"标题: {pr_info['title']}")
+    print(f"状态: {pr_info['state']}")
+    print(f"作者: {pr_info['user']['login']}")
+    print(f"创建时间: {pr_info['created_at']}")
+    print(f"更新时间: {pr_info['updated_at']}")
+    print(f"源分支: {pr_info['head']['ref']}")
+    print(f"目标分支: {pr_info['base']['ref']}")
+    print(f"描述: {pr_info['body'] or '无'}")
+
+
+def print_pr_files(files: list):
+    """打印 PR 文件变更信息"""
+    print("\n=== 文件变更 ===")
+    print(f"共变更 {len(files)} 个文件\n")
 
     for file in files:
-        print("=" * 50)
-        print(f"📄 文件名: {file['filename']}")
-        print(f"📝 修改类型: {file['status']}")
-        print(f"➕ 新增行数: {file['additions']}")
-        print(f"➖ 删除行数: {file['deletions']}")
-        print(f"🔄 总变更: {file['changes']}")
-
-        patch = file.get("patch")
-
-        if patch:
-            print("\n💻 Diff:")
-            print(patch)
-        else:
-            print("\n(无 diff 内容，可能是二进制文件或文件过大)")
-
+        print(f"文件: {file['filename']}")
+        print(f"  状态: {file['status']}")
+        print(f"  添加: +{file['additions']} 行")
+        print(f"  删除: -{file['deletions']} 行")
+        print(f"  变更: {file['changes']} 行")
+        if file.get('patch'):
+            print(f"  差异预览:")
+            # 只显示前10行差异
+            patch_lines = file['patch'].split('\n')
+            for line in patch_lines[:10]:
+                print(f"    {line}")
+            if len(patch_lines) > 10:
+                remaining_lines = len(patch_lines) - 10
+                print(f"    ... (还有 {remaining_lines} 行)")
         print()
 
-    print("=" * 50)
-    print("✅ 完成")
 
-except requests.exceptions.HTTPError as e:
-    print(f"❌ HTTP 错误: {e}")
-    print(f"响应内容: {response.text}")
-    sys.exit(1)
-except requests.exceptions.RequestException as e:
-    print(f"❌ 请求错误: {e}")
-    sys.exit(1)
-except Exception as e:
-    print(f"❌ 未知错误: {e}")
-    sys.exit(1)
+def main():
+    """命令行脚本入口"""
+    try:
+        # 获取 PR 信息
+        pr_info = get_pr_info(OWNER, REPO, PR_NUMBER)
+        print_pr_info(pr_info)
+
+        # 获取文件变更
+        files = get_pr_files(OWNER, REPO, PR_NUMBER)
+        print_pr_files(files)
+
+    except Exception as e:
+        print(f"错误: {e}")
+        return 1
+
+    return 0
+
+
+if __name__ == "__main__":
+    exit(main())

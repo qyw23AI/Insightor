@@ -1,68 +1,95 @@
 """
-测试 AI API 连接和基本功能
+测试 Claude API 连接和基本功能
 """
 import os
 from dotenv import load_dotenv
 from anthropic import Anthropic
 
 # 加载环境变量
-load_dotenv(dotenv_path="../fetch_pr/.env")
+load_dotenv()
 
 def test_claude_api():
-    """测试 Claude API 连接"""
+    """测试 Claude API 基本连接"""
+    print("=== 测试 Claude API 连接 ===\n")
+
+    # 获取 API 配置
     api_key = os.getenv("ANTHROPIC_API_KEY")
+    base_url = os.getenv("ANTHROPIC_BASE_URL")
 
     if not api_key:
-        print("❌ 错误: 请在 .env 文件中设置 ANTHROPIC_API_KEY")
+        print("❌ 错误：未找到 ANTHROPIC_API_KEY 环境变量")
+        print("请在 .env 文件中设置 ANTHROPIC_API_KEY")
         return False
 
+    print(f"✓ API Key: {api_key[:20]}...")
+    if base_url:
+        print(f"✓ Base URL: {base_url}")
+
     try:
-        # 初始化 Anthropic 客户端
-        client = Anthropic(api_key=api_key)
+        # 初始化客户端，支持自定义 base_url
+        client_kwargs = {"api_key": api_key}
+        if base_url:
+            client_kwargs["base_url"] = base_url
 
-        print("🔄 正在测试 Claude API 连接...")
+        client = Anthropic(**client_kwargs)
 
-        # 发送一个简单的测试请求
-        message = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
-            max_tokens=1024,
-            messages=[
-                {
-                    "role": "user",
-                    "content": "请用一句话介绍你自己，并说明你在代码审查方面的能力。"
-                }
-            ]
-        )
+        # 尝试多个可能的模型名称
+        models_to_try = [
+            "claude-opus-4-8",
+            "claude-3-opus-20240229",
+            "claude-3-5-sonnet-20241022",
+            "claude-3-sonnet-20240229"
+        ]
 
-        response_text = message.content[0].text
+        for model in models_to_try:
+            print(f"\n尝试模型: {model}")
+            try:
+                message = client.messages.create(
+                    model=model,
+                    max_tokens=100,
+                    messages=[
+                        {"role": "user", "content": "Hello! Please respond with 'API connection successful'."}
+                    ]
+                )
 
-        print("✅ Claude API 连接成功！")
-        print(f"\n📝 Claude 的回复:\n{response_text}")
-        print(f"\n📊 Token 使用情况:")
-        print(f"   - 输入 tokens: {message.usage.input_tokens}")
-        print(f"   - 输出 tokens: {message.usage.output_tokens}")
+                print(f"✓ 成功！模型 {model} 可用")
+                print(f"响应: {message.content[0].text}")
+                print(f"Token 使用: input={message.usage.input_tokens}, output={message.usage.output_tokens}")
+                return True
 
-        return True
+            except Exception as e:
+                print(f"✗ 模型 {model} 失败: {str(e)}")
+                continue
+
+        print("\n❌ 所有模型都失败了")
+        return False
 
     except Exception as e:
-        print(f"❌ Claude API 测试失败: {str(e)}")
+        print(f"\n❌ API 连接失败: {str(e)}")
         return False
 
 def test_code_analysis():
     """测试代码分析功能"""
+    print("\n\n=== 测试代码分析功能 ===\n")
+
+    # 获取 API 配置
     api_key = os.getenv("ANTHROPIC_API_KEY")
+    base_url = os.getenv("ANTHROPIC_BASE_URL")
 
     if not api_key:
-        print("❌ 错误: 请在 .env 文件中设置 ANTHROPIC_API_KEY")
+        print("❌ 错误：未找到 ANTHROPIC_API_KEY 环境变量")
         return False
 
     try:
-        client = Anthropic(api_key=api_key)
+        # 初始化客户端，支持自定义 base_url
+        client_kwargs = {"api_key": api_key}
+        if base_url:
+            client_kwargs["base_url"] = base_url
 
-        print("\n🔄 正在测试代码分析功能...")
+        client = Anthropic(**client_kwargs)
 
-        # 测试代码片段
-        test_code = """
+        # 示例代码
+        sample_code = """
 def calculate_total(items):
     total = 0
     for item in items:
@@ -70,58 +97,35 @@ def calculate_total(items):
     return total
 """
 
+        print("分析以下代码：")
+        print(sample_code)
+        print("\n正在分析...")
+
         message = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
-            max_tokens=2048,
+            model="claude-opus-4-8",  # 使用用户确认的模型
+            max_tokens=500,
             messages=[
                 {
                     "role": "user",
-                    "content": f"""请分析以下 Python 代码，指出：
-1. 代码的功能
-2. 潜在的问题或风险
-3. 改进建议
-
-代码：
-```python
-{test_code}
-```
-
-请用中文回复，格式清晰。"""
+                    "content": f"请分析以下 Python 代码，指出潜在问题并提供改进建议：\n\n{sample_code}"
                 }
             ]
         )
 
-        response_text = message.content[0].text
-
-        print("✅ 代码分析测试成功！")
-        print(f"\n📝 分析结果:\n{response_text}")
-        print(f"\n📊 Token 使用情况:")
-        print(f"   - 输入 tokens: {message.usage.input_tokens}")
-        print(f"   - 输出 tokens: {message.usage.output_tokens}")
-
+        print("\n分析结果：")
+        print(message.content[0].text)
+        print(f"\nToken 使用: input={message.usage.input_tokens}, output={message.usage.output_tokens}")
         return True
 
     except Exception as e:
-        print(f"❌ 代码分析测试失败: {str(e)}")
+        print(f"\n❌ 代码分析失败: {str(e)}")
         return False
 
 if __name__ == "__main__":
-    print("=" * 60)
-    print("AI API 测试工具")
-    print("=" * 60)
+    # 运行测试
+    api_ok = test_claude_api()
 
-    # 测试 1: API 连接
-    success1 = test_claude_api()
-
-    if success1:
-        # 测试 2: 代码分析
-        success2 = test_code_analysis()
-
-        if success2:
-            print("\n" + "=" * 60)
-            print("✅ 所有测试通过！可以开始开发 AI 代码评审工具了。")
-            print("=" * 60)
-        else:
-            print("\n⚠️ 代码分析测试失败，请检查配置。")
+    if api_ok:
+        test_code_analysis()
     else:
-        print("\n⚠️ API 连接测试失败，请检查 API Key 配置。")
+        print("\n⚠️  API 连接测试失败，跳过代码分析测试")
