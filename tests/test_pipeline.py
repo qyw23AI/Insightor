@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from insightor.pipeline import ReviewPipeline, PipelineError
-from insightor.schemas.urf import AnalysisDepth, MergeRecommendation, ReviewMeta, ReviewResult, PRSummary
+from insightor.schemas.urf import AnalysisDepth, MergeRecommendation, ReviewMeta, ReviewPriority, ReviewResult, PRSummary
 
 
 class TestReviewPipeline:
@@ -52,3 +52,26 @@ class TestReviewPipeline:
         assert result.file_walkthrough[0].path == "a.py"
         assert result.findings == []  # describe produces no findings
         assert result.merge_readiness is None  # describe produces no merge readiness
+
+    @pytest.mark.asyncio
+    async def test_risks_tool_routing(self, pipeline):
+        """risks tool 使用 RisksParser，解析 findings + overall。"""
+        from insightor.ai.response_parser import RisksParser
+        risks_json = (
+            '{"findings": ['
+            '{"type": "risk", "severity": "critical", "category": "security",'
+            '"title": "SQL注入", "file": "db.py", "line_start": 10, "line_end": 10,'
+            '"confidence": 0.95}'
+            '], "overall": {"score": 40, "blocking_issues": ["SQL注入"],'
+            '"review_priority": "high", "estimated_review_time_min": 15,'
+            '"summary": "严重安全问题"}}'
+        )
+        meta = ReviewMeta(pr_url="https://github.com/test/pull/1")
+        result = RisksParser.parse(risks_json, meta)
+
+        assert len(result.findings) == 1
+        assert result.findings[0].severity.value == "critical"
+        assert result.merge_readiness is not None
+        assert result.merge_readiness.score == 40.0
+        assert result.merge_readiness.blocking_issues == ["SQL注入"]
+        assert result.merge_readiness.review_priority == ReviewPriority.HIGH.value

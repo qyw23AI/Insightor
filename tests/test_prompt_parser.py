@@ -3,8 +3,14 @@
 import pytest
 
 from insightor.ai.prompt_builder import PromptBuilder
-from insightor.ai.response_parser import ResponseParser, DescribeParser, _extract_json
-from insightor.schemas.urf import ReviewMeta, MergeRecommendation
+from insightor.ai.response_parser import (
+    ResponseParser, DescribeParser, RisksParser,
+    MergeReadinessCalc, _extract_json,
+)
+from insightor.schemas.urf import (
+    ReviewMeta, MergeRecommendation, MergeReadiness,
+    ReviewPriority, Finding, Severity, Location, Range, Position,
+)
 
 
 # =============================================================================
@@ -223,3 +229,194 @@ class TestDescribeParser:
         assert result.summary.pr_type == "refactor"
         assert result.file_walkthrough == []
         assert result.findings == []
+
+
+# =============================================================================
+# MergeReadinessCalc
+# =============================================================================
+
+def _make_finding(severity: str, title: str = "test", category: str = "logic") -> Finding:
+    from insightor.schemas.urf import FindingType
+    return Finding(
+        type=FindingType.RISK,
+        severity=severity,
+        category=category,
+        title=title,
+        description="测试描述",
+        location=Location(path="a.py", range=Range(start=Position(line=1), end=Position(line=1))),
+    )
+
+
+class TestMergeReadinessCalc:
+    @pytest.fixture
+    def calc(self):
+        return MergeReadinessCalc()
+
+    def test_no_findings(self):
+        mr = MergeReadinessCalc.calculate([])
+        assert mr.score == 100.0
+        assert mr.recommendation == MergeRecommendation.SAFE_TO_MERGE
+        assert mr.blocking_issues == []
+        assert mr.review_priority == ReviewPriority.LOW.value
+
+    def test_critical_only(self):
+        findings = [_make_finding("critical", "SQL注入")]
+        mr = MergeReadinessCalc.calculate(findings)
+        assert mr.score == 70.0
+        assert mr.recommendation == MergeRecommendation.NEEDS_REVIEW
+        assert "SQL注入" in mr.blocking_issues
+        assert mr.review_priority == ReviewPriority.HIGH.value
+
+    def test_critical_blocks(self):
+        findings = [
+            _make_finding("critical", f"风险{i}")
+            for i in range(3)
+        ]
+        mr = MergeReadinessCalc.calculate(findings)
+        assert mr.score == 10.0
+        assert mr.recommendation == MergeRecommendation.BLOCKED
+        assert len(mr.blocking_issues) == 3
+
+    def test_high_threshold_blocking(self):
+        findings = [
+            _make_finding("high", f"高{i}")
+            for i in range(4)
+        ]
+        mr = MergeReadinessCalc.calculate(findings)
+        assert mr.score == 60.0
+        assert len(mr.blocking_issues) == 4
+
+    def test_few_high_no_blocking(self):
+        findings = [_make_finding("high", "高1"), _make_finding("high", "高2")]
+        mr = MergeReadinessCalc.calculate(findings)
+        assert len(mr.blocking_issues) == 0
+
+    def test_mixed_severities(self):
+        findings = [
+            _make_finding("critical", "c1"),
+            _make_finding("high", "h1"),
+            _make_finding("medium", "m1"),
+            _make_finding("medium", "m2"),
+            _make_finding("low", "l1"),
+        ]
+        mr = MergeReadinessCalc.calculate(findings)
+        assert mr.score == 53.0  # 100 - 30 - 10 - 3*2 - 1 = 53
+
+    def test_score_clamped_low(self):
+        findings = [_make_finding("critical", f"阻断{i}") for i in range(10)]
+        mr = MergeReadinessCalc.calculate(findings)
+        assert mr.score == 0.0
+
+    def test_score_clamped_high(self):
+        mr = MergeReadinessCalc.calculate([], files_changed=0)
+        assert mr.score == 100.0
+
+    def test_review_priority_high(self):
+        findings = [_make_finding("high", "h1")]
+        mr = MergeReadinessCalc.calculate(findings)
+        assert mr.review_priority == ReviewPriority.MEDIUM.value
+
+    def test_review_priority_files(self):
+        mr = MergeReadinessCalc.calculate([], files_changed=11)
+        assert mr.review_priority == ReviewPriority.MEDIUM.value
+
+    def test_review_priority_low(self):
+        mr = MergeReadinessCalc.calculate([], files_changed=0)
+        assert mr.review_priority == ReviewPriority.LOW.value
+
+    def test_estimated_review_time(self):
+        mr = MergeReadinessCalc.calculate(
+            [_make_finding("medium", f"m{i}") for i in range(5)],
+        )
+        assert mr.estimated_review_time_min == 10
+
+
+# =============================================================================
+# RisksParser
+# =============================================================================
+
+class TestRisksParser:
+    @pytest.fixture
+    def meta(self):
+        return ReviewMeta(pr_url="https://github.com/a/b/pull/1", files_analyzed=5)
+
+    def test_from_dict_with_overall(self, meta):
+        data = {
+            "findings": [
+                {"type": "risk", "severity": "critical", "category": "security",
+                 "title": "SQL注入", "description": "未参数化", "file": "db.py",
+                 "line_start": 10, "line_end": 10, "suggestion": "使用参数化查询",
+                 "confidence": 0.95},
+            ],
+            "overall": {
+                "score": 40,
+                "blocking_issues": ["SQL注入"],
+                "review_priority": "high",
+                "estimated_review_time_min": 15,
+                "summary": "严重安全问题",
+            },
+        }
+        result = RisksParser.from_dict(data, meta)
+        assert len(result.findings) == 1
+        assert result.findings[0].title == "SQL注入"
+        assert result.merge_readiness is not None
+        assert result.merge_readiness.score == 40.0
+        assert result.merge_readiness.review_priority == ReviewPriority.HIGH.value
+        assert result.merge_readiness.blocking_issues == ["SQL注入"]
+
+    def test_from_dict_missing_overall(self, meta):
+        data = {
+            "findings": [
+                {"type": "risk", "severity": "critical", "category": "security",
+                 "title": "密钥硬编码", "description": "JWT secret 写死", "file": "a.py",
+                 "line_start": 1, "line_end": 1, "confidence": 0.9},
+            ],
+        }
+        result = RisksParser.from_dict(data, meta)
+        assert len(result.findings) == 1
+        assert result.merge_readiness is not None
+        assert result.merge_readiness.score == 70.0  # 100 - 30
+
+    def test_from_dict_empty(self, meta):
+        result = RisksParser.from_dict({}, meta)
+        assert result.findings == []
+        assert result.merge_readiness is not None
+        assert result.merge_readiness.score == 100.0
+
+    def test_with_summary(self, meta):
+        data = {"summary": {"pr_type": "bugfix", "overview": "修复崩溃"}}
+        result = RisksParser.from_dict(data, meta)
+        assert result.summary.pr_type == "bugfix"
+
+    def test_missing_summary(self, meta):
+        result = RisksParser.from_dict({}, meta)
+        assert result.summary.pr_type == ""
+
+    def test_findings_mapped(self, meta):
+        data = {
+            "findings": [
+                {"type": "risk", "severity": "high", "category": "performance",
+                 "title": "N+1查询", "file": "query.py",
+                 "line_start": 20, "line_end": 25, "confidence": 0.8},
+            ],
+        }
+        result = RisksParser.from_dict(data, meta)
+        assert len(result.findings) == 1
+        f = result.findings[0]
+        assert f.severity.value == "high"
+        assert f.category == "performance"
+        assert f.location.path == "query.py"
+
+    def test_parse_raw(self, meta):
+        raw = (
+            '{"findings": [{"type": "risk", "severity": "low", "category": "style",'
+            '"title": "命名不规范", "file": "x.py", "line_start": 1, "line_end": 1,'
+            '"confidence": 0.3}], "overall": {"score": 95}}'
+        )
+        result = RisksParser.parse(raw, meta)
+        assert len(result.findings) == 1
+        assert result.merge_readiness.score == 95.0
+
+    def test_no_files_in_data(self, meta):
+        result = RisksParser.from_dict({"findings": []}, meta)
+        assert result.file_walkthrough == []

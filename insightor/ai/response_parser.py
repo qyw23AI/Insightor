@@ -22,6 +22,7 @@ from insightor.schemas.urf import (
     QualityMetrics,
     Range,
     ReviewMeta,
+    ReviewPriority,
     ReviewResult,
     ReviewStats,
     Severity,
@@ -140,6 +141,137 @@ class DescribeParser:
         )
 
 
+class MergeReadinessCalc:
+    """独立工具: 从 findings 计算 MergeReadiness。
+
+    当 AI 未提供 overall 评分时作为 fallback。
+    """
+
+    @staticmethod
+    def calculate(
+        findings: list[Finding],
+        files_changed: int = 0,
+    ) -> MergeReadiness:
+        sev_counts: dict[str, int] = {}
+        for f in findings:
+            sev_counts[f.severity.value] = sev_counts.get(f.severity.value, 0) + 1
+
+        c = sev_counts.get("critical", 0)
+        h = sev_counts.get("high", 0)
+        m = sev_counts.get("medium", 0)
+        l = sev_counts.get("low", 0)
+
+        score = 100.0 - (c * 30 + h * 10 + m * 3 + l * 1)
+        score = max(0.0, min(100.0, score))
+
+        blocking: list[str] = []
+        for f in findings:
+            if f.severity == Severity.CRITICAL:
+                blocking.append(f.title)
+        if h >= 3:
+            for f in findings:
+                if f.severity == Severity.HIGH:
+                    blocking.append(f.title)
+
+        if c > 0:
+            priority = ReviewPriority.HIGH
+        elif h > 0 or files_changed > 10:
+            priority = ReviewPriority.MEDIUM
+        else:
+            priority = ReviewPriority.LOW
+
+        parts = [f"风险分析发现 {len(findings)} 个问题"]
+        if c:
+            parts.append(f"其中严重 {c} 个")
+        if h:
+            parts.append(f"高 {h} 个")
+        summary = "，".join(parts)
+
+        return MergeReadiness(
+            score=score,
+            recommendation=_score_to_recommendation(score),
+            blocking_issues=blocking,
+            review_priority=priority.value,
+            estimated_review_time_min=len(findings) * 2,
+            summary=summary,
+        )
+
+
+class RisksParser:
+    """将 AI 风险分析 JSON 解析为 ReviewResult。
+
+    处理 risks 工具的 JSON 格式:
+      { findings: [...], overall: { score, blocking_issues, ... } }
+    overall 缺失时自动通过 MergeReadinessCalc 计算。
+    """
+
+    @staticmethod
+    def parse(raw: str, meta: ReviewMeta) -> ReviewResult:
+        data = _extract_json(raw)
+        return RisksParser.from_dict(data, meta)
+
+    @staticmethod
+    def from_dict(data: dict, meta: ReviewMeta) -> ReviewResult:
+        findings: list[Finding] = []
+        for item in data.get("findings", []):
+            findings.append(_parse_finding(item))
+
+        overall = data.get("overall")
+        if overall and "score" in overall:
+            mr_score = float(overall["score"])
+            mr = MergeReadiness(
+                score=max(0.0, min(100.0, mr_score)),
+                recommendation=_score_to_recommendation(mr_score),
+                blocking_issues=overall.get("blocking_issues", []),
+                review_priority=_parse_priority(overall.get("review_priority", "medium")),
+                estimated_review_time_min=int(overall.get("estimated_review_time_min", len(findings) * 2)),
+                summary=overall.get("summary", ""),
+            )
+        else:
+            mr = MergeReadinessCalc.calculate(findings, files_changed=meta.files_analyzed)
+
+        summary_data = data.get("summary", {})
+        summary = PRSummary(
+            pr_type=summary_data.get("pr_type", ""),
+            overview=summary_data.get("overview", ""),
+            files_changed=meta.files_analyzed,
+        )
+
+        walkthrough: list[FileWalkthrough] = []
+        for fw in data.get("files", []):
+            walkthrough.append(FileWalkthrough(
+                path=fw.get("path", ""),
+                edit_type=_str_to_edit_type(fw.get("change", "modified")),
+                summary=fw.get("change", fw.get("summary", "")),
+            ))
+
+        sev_counts: dict[str, int] = {}
+        cat_counts: dict[str, int] = {}
+        for f in findings:
+            sv = f.severity.value
+            cat = f.category
+            sev_counts[sv] = sev_counts.get(sv, 0) + 1
+            cat_counts[cat] = cat_counts.get(cat, 0) + 1
+
+        stats = ReviewStats(
+            total_findings=len(findings),
+            by_severity=sev_counts,
+            by_category=cat_counts,
+            quality=QualityMetrics(
+                confidence_distribution=_calc_confidence_distribution(findings),
+            ),
+        )
+
+        return ReviewResult(
+            meta=meta,
+            summary=summary,
+            file_walkthrough=walkthrough,
+            findings=findings,
+            stats=stats,
+            merge_readiness=mr,
+        )
+
+
 # =============================================================================
 # 内部辅助
 # =============================================================================
@@ -234,6 +366,13 @@ def _str_to_edit_type(s: str) -> EditType:
     if "delet" in s or "remov" in s: return EditType.DELETED
     if "renam" in s: return EditType.RENAMED
     return EditType.MODIFIED
+
+
+def _parse_priority(priority: str) -> ReviewPriority:
+    try:
+        return ReviewPriority(priority.lower())
+    except ValueError:
+        return ReviewPriority.MEDIUM
 
 
 def _score_to_recommendation(score: float) -> MergeRecommendation:
