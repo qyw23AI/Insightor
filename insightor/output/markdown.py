@@ -85,7 +85,8 @@ class MarkdownFileOutput:
             for i, f in enumerate(result.findings, 1):
                 icon = _SEVERITY_ICON.get(f.severity, "")
                 lines.append(f"")
-                lines.append(f"### {i}. {icon} [{f.severity.value}] {f.title}")
+                lines.append(f"### {i}. {icon} [{f.severity.value}] {f.title}"
+                             f" <!-- finding-id: {f.id} -->")
                 lines.append(f"")
                 lines.append(f"- **类别**: {f.category}")
                 lines.append(f"- **文件**: `{f.location.path}:{f.location.range.start.line}`")
@@ -104,6 +105,28 @@ class MarkdownFileOutput:
                         lines.append(f"  ```")
                 if f.confidence:
                     lines.append(f"- **置信度**: {f.confidence:.0%}")
+                # Feedback checkboxes for human-in-the-loop
+                lines.append(f"")
+                lines.append(f"- [ ] confirmed")
+                lines.append(f"- [ ] false_positive")
+                lines.append(f"- [ ] addressed")
+                lines.append(f"- [ ] ignored")
+                lines.append(f"- **审查者:** ")
+                lines.append(f"- **备注:** ")
+
+        # Feedback footer
+        lines.append(f"")
+        lines.append(f"---")
+        lines.append(f"")
+        lines.append(f"## 反馈说明")
+        lines.append(f"")
+        lines.append(f"请根据实际情况勾选以上发现的反馈。确认后运行发布脚本:")
+        lines.append(f"")
+        lines.append(f"```bash")
+        lines.append(f"python scripts/publish.py {fname}")
+        lines.append(f"```")
+        lines.append(f"")
+        lines.append(f"<!-- insightor-pr-url: {meta.pr_url} -->")
 
         if result.summary.diagram:
             lines.append(f"")

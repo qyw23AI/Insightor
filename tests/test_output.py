@@ -193,6 +193,27 @@ class TestMarkdownFileOutput:
             content = list(Path(tmp).glob("*.md"))[0].read_text(encoding="utf-8")
             assert "发现 (5)" in content
 
+    def test_post_contains_finding_id(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            md = MarkdownFileOutput(output_dir=tmp)
+            finding = _make_finding("test")
+            md.post(_make_result(findings=[finding]))
+            content = list(Path(tmp).glob("*.md"))[0].read_text(encoding="utf-8")
+            assert "<!-- finding-id:" in content
+            assert str(finding.id) in content
+
+    def test_post_contains_feedback_checkboxes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            md = MarkdownFileOutput(output_dir=tmp)
+            findings = [_make_finding("f1"), _make_finding("f2")]
+            md.post(_make_result(findings=findings))
+            content = list(Path(tmp).glob("*.md"))[0].read_text(encoding="utf-8")
+            assert content.count("- [ ] confirmed") == 2
+            assert content.count("- [ ] false_positive") == 2
+            assert content.count("- **审查者:**") == 2
+            assert "反馈说明" in content
+            assert "scripts/publish.py" in content
+
 
 # =============================================================================
 # JSONOutput
