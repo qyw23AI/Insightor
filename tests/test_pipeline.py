@@ -75,3 +75,30 @@ class TestReviewPipeline:
         assert result.merge_readiness.score == 40.0
         assert result.merge_readiness.blocking_issues == ["SQL注入"]
         assert result.merge_readiness.review_priority == ReviewPriority.HIGH.value
+
+    @pytest.mark.asyncio
+    async def test_improve_tool_routing(self, pipeline):
+        """improve tool 使用 ImproveParser，解析 suggestions + overall。"""
+        from insightor.ai.response_parser import ImproveParser
+        improve_json = (
+            '{"summary": {"pr_type": "refactor", "overview": "代码质量良好"},'
+            '"suggestions": ['
+            '{"severity": "high", "category": "performance",'
+            '"title": "缓存计算结果", "file": "calc.py", "line_start": 5, "line_end": 5,'
+            '"current_code": "result = expensive(x)",'
+            '"suggested_code": "result = cache.get(x) or expensive(x)",'
+            '"is_committable": true, "confidence": 0.88}'
+            '], "overall": {"score": 85, "summary": "不错"}}'
+        )
+        meta = ReviewMeta(pr_url="https://github.com/test/pull/1")
+        result = ImproveParser.parse(improve_json, meta)
+
+        assert len(result.findings) == 1
+        assert result.findings[0].type.value == "suggestion"
+        assert result.findings[0].severity.value == "high"
+        assert result.findings[0].suggestion is not None
+        assert result.findings[0].suggestion.is_committable is True
+        assert "expensive" in result.findings[0].suggestion.current_code
+        assert result.merge_readiness is not None
+        assert result.merge_readiness.score == 85.0
+        assert result.summary.pr_type == "refactor"
