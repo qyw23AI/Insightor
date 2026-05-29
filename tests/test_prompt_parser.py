@@ -66,6 +66,37 @@ class TestPromptBuilder:
 # ResponseParser
 # =============================================================================
 
+class TestRepairTruncatedJSON:
+    def test_truncated_mid_array(self):
+        from insightor.ai.response_parser import _repair_truncated_json
+        truncated = '{"findings": [{"title": "a"}, {"title": "b"'
+        repaired = _repair_truncated_json(truncated)
+        assert repaired is not None
+        import json
+        data = json.loads(repaired)
+        assert len(data["findings"]) == 2
+
+    def test_truncated_mid_string(self):
+        from insightor.ai.response_parser import _repair_truncated_json
+        truncated = '{"summary": {"overview": "something'
+        repaired = _repair_truncated_json(truncated)
+        # 不完整字符串被闭合并补齐括号 → 可解析
+        assert repaired is not None
+        import json
+        data = json.loads(repaired)
+        assert data["summary"]["overview"] == "something"
+
+    def test_not_truncated(self):
+        from insightor.ai.response_parser import _repair_truncated_json
+        assert _repair_truncated_json('{"a": 1}') is None
+
+    def test_extract_repairs_truncated(self):
+        from insightor.ai.response_parser import _extract_json
+        raw = '```json\n{"findings": [{"severity": "high", "category": "security", "title": "SQL注入", "file": "db.py", "line_start": 10, "line_end": 10, "confidence": 0.9}, {"severity": "medium"'
+        data = _extract_json(raw)
+        assert len(data.get("findings", [])) >= 1
+
+
 class TestExtractJSON:
     def test_pure_json(self):
         assert _extract_json('{"a": 1}') == {"a": 1}

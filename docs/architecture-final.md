@@ -404,7 +404,7 @@ FeedbackCollector 收集反馈
 
 ---
 
-## 六、PR 拆分计划（共 13 个 PR，3 天）
+## 六、PR 拆分计划（共 18 个 PR，5 天）
 
 ---
 
@@ -563,163 +563,68 @@ class IssueInfo:  # ★ v3 新增
 
 ---
 
-#### PR #3：Diff 处理管线 + 分层上下文管线 (Aider 增强)
+#### PR #3：Diff 处理管线（已实现部分）
 
-**标题**：实现 PR Diff 处理与 Aider 启发式分层上下文获取管线
+**标题**：实现 PR Diff 多阶段处理管线——文件过滤、语言检测、Token 估算与渐进压缩
 
 **功能描述**：
-对获取的 diff 数据进行多阶段处理（过滤、语言检测、Token 管理、渐进压缩）。**核心新增**：基于 Aider 架构的分层上下文管线——使用 tree-sitter 提取符号、构建依赖图、PageRank 排序关联文件、二分搜索 Token 适配。
+对获取的 diff 数据进行多阶段处理：智能过滤无关文件（锁文件/图片/生成代码）、自动语言检测与优先级排序、精确 Token 估算、渐进压缩适配 Token 预算。
 
-**关键新增（vs V2）**：
-
-1. **Aider 启发的 6 个核心模块** (新增 `processing/context/` 子包)：
-   - `SymbolExtractor` — 使用 tree-sitter + `.scm` query 从源码提取符号定义/引用
-   - `TagCache` — diskcache + mtime 驱动，只重新解析变更文件
-   - `DependencyGraph` — networkx.MultiDiGraph，文件级符号依赖图
-   - `RelevanceRanker` — 个性化 PageRank (PR 文件 50x 权重 → 降权噪音)
-   - `BudgetFitter` — 二分搜索，在 token 预算内选最优符号集合
-   - `CompactCodeRenderer` — Tree View 骨架渲染，节省 80% token
-
-2. **五个 ContextSource 实现**：DiffSource、FileContextSource、IssueSource、RelatedFileSource (Aider PageRank)、RepoAnalysisSource
-
-3. **IncrementalDiffer** 完善增量 diff + 结果合并
+> **注意**：原计划中「分层上下文管线 (Context Pipeline)」部分（tree-sitter 符号提取、依赖图、PageRank 排序等）未在本 PR 实现，已拆分为独立 PR #13-16。
 
 **涉及接口**：
 
 ```python
-# ===== 文件处理 (保留 V2) =====
-class FileFilter: ...
-class LanguageDetector: ...
-class TokenEstimator: ...
-class DiffCompressor: ...
+# ===== 文件处理 =====
+class FileFilter:
+    """智能文件过滤——忽略锁文件/图片/生成代码/二进制"""
+    def filter(self, files: list[FilePatchInfo]) -> list[FilePatchInfo]: ...
+    def is_ignored(self, filename: str) -> bool: ...
+    # 支持 glob 和 regex 自定义规则
 
-# ===== ★ Aider 启发：符号提取与缓存 =====
-@dataclass
-class SymbolTag:
-    fname: str; rel_fname: str; line: int; name: str
-    kind: str  # "def" | "ref"
+class LanguageDetector:
+    """自动语言检测与主语言优先排序"""
+    def detect(self, file: FilePatchInfo) -> str: ...
+    def group_by_language(self, files) -> dict[str, list]: ...
+    def sort_by_priority(self, files, main_language) -> list: ...
+    # 支持 Python/JS/TS/Go/Java/Rust 等
 
-class SymbolExtractor:
-    """tree-sitter 符号提取器"""
-    def __init__(self, query_dir: str = "config/queries")
-    def extract_file(self, fname: str) -> list[SymbolTag]: ...
-    def extract_from_diff(self, files: list[FilePatchInfo]) -> list[SymbolTag]: ...
-    def get_modified_symbols(self, diff_files) -> set[str]: ...  # {symbol_name, ...}
+class TokenEstimator:
+    """Token 估算——优先使用 tiktoken，fallback 到系数估算"""
+    def count(self, text: str, model: str = "gpt-4o") -> int: ...
+    def estimate_quick(self, text: str) -> int: ...
+    # DeepSeek 等非 OpenAI 模型使用系数估算 (×1.5)
 
-class TagCache:
-    """mtime 驱动的增量符号缓存"""
-    def __init__(self, repo_path: str, cache_dir: str = ".insightor/tags")
-    def get(self, fname: str) -> list[SymbolTag] | None: ...
-    def put(self, fname: str, tags: list[SymbolTag]) -> None: ...
-    def invalidate(self, fname: str) -> None: ...
+class DiffCompressor:
+    """渐进压缩——Level 0→3 逐步减少 token"""
+    def __init__(self, max_tokens: int): ...
+    def compress(self, files, depth) -> CompressedDiff: ...
+    # Level 0: 完整 diff → Level 1: 删减 hunk → Level 2: 截断文件 → Level 3: 仅签名
 
-# ===== ★ Aider 启发：依赖图与排序 =====
-class DependencyGraph:
-    """文件级符号依赖图 (nx.MultiDiGraph)"""
-    def __init__(self)
-    def add_tags(self, tags: list[SymbolTag]) -> None: ...
-    def build_edges(self) -> None:
-        """构建有向边: 引用方文件 → 定义方文件
-           权重乘数: PR引用=50x, 复合名=10x, 私有=0.1x, 泛用(>5文件)=0.1x"""
-    def get_callers(self, symbol: str) -> list[str]: ...
-    def get_callees(self, symbol: str) -> list[str]: ...
-
-class RelevanceRanker:
-    """个性化 PageRank 文件相关性排序"""
-    def __init__(self, graph: DependencyGraph)
-    def rank(
-        self,
-        pr_files: set[str],                  # PR diff 文件 (personalization)
-        mentioned_idents: set[str] = set(),   # PR 描述/Issue 中的标识符
-        dependency_map: dict[str, list[str]] = {},  # .insightor.yml
-    ) -> list[tuple[str, str, float]]:       # [(fname, symbol, score), ...]
-
-class BudgetFitter:
-    """二分搜索 Token 预算内最优符号集合"""
-    def fit(self, ranked: list, budget: int, renderer) -> str: ...
-    # 初始猜测: budget // 25 tokens_per_symbol
-    # 接受条件: abs(actual - budget) / budget < 0.15
-
-class CompactCodeRenderer:
-    """紧凑 Tree View 渲染 (Aider grep_ast.TreeContext 风格)"""
-    def render(self, items: list[tuple[str, str, float]], context_lines: int = 3) -> str:
-        """输出格式:
-        src/services/user.py:
-        │class UserService:
-        │    def authenticate(self, token):
-        │        ...
-        │    def find_by_email(self, email):
-            ..."""
-
-# ===== ★ 分层上下文管线 =====
-class ContextSource(Protocol):
-    name: str; layer: int
-    async def fetch(self, pr_info, files) -> ContextChunk: ...
-
-class RelatedFileSource(ContextSource):  # Layer 4 (Aider 增强)
-    """★ 使用 PageRank 算法替代简单 git grep"""
-    def __init__(self, provider, tag_cache, extractor):
-        self.graph = DependencyGraph()
-        self.ranker = RelevanceRanker(self.graph)
-        self.fitter = BudgetFitter()
-        self.renderer = CompactCodeRenderer()
-
-    async def fetch(self, pr_info, files) -> ContextChunk:
-        # 1. tree-sitter 提取 PR 中被修改的符号
-        modified = self.extractor.get_modified_symbols(files)
-        # 2. 获取/缓存仓库其余文件的 Tag
-        all_tags = self._get_all_tags_with_cache(files)
-        # 3. 构建依赖图 + PageRank 排序
-        self.graph.add_tags(all_tags); self.graph.build_edges()
-        ranked = self.ranker.rank(pr_files={f.filename for f in files})
-        # 4. 二分搜索 + Tree View 渲染
-        rendered = self.fitter.fit(ranked, self.token_budget, self.renderer)
-        return ContextChunk(source_name="related_files", content=rendered, ...)
-
-class ContextPipeline:
-    async def gather(self, pr_info, files, depth) -> AssembledContext: ...
-    def allocate_budget(self, depth) -> dict[str, int]: ...
-
-# ===== 增量与缓存 =====
-class IncrementalDiffer: ...
 class CacheManager:
+    """PR 结果缓存——(PR_URL + SHA) 索引，支持增量审查"""
     def get(self, pr_url, sha) -> ReviewResult | None: ...
     def put(self, pr_url, sha, result) -> None: ...
-    def get_incremental_base(self, pr_url, current_sha) -> tuple[str, ReviewResult] | None: ...
+    def get_latest(self, pr_url) -> ReviewResult | None: ...
+    def get_base_for_incremental(self, pr_url, current_sha) -> tuple[str, ReviewResult] | None: ...
 ```
 
-**目录结构**：
+**实际实现文件**：
 ```
-insightor/processing/context/
-├── __init__.py
-├── pipeline.py          # ContextPipeline
-├── sources/
-│   ├── __init__.py
-│   ├── diff.py          # Layer 1
-│   ├── file_context.py  # Layer 2
-│   ├── issues.py        # Layer 3
-│   ├── related_files.py # Layer 4 (★ Aider PageRank)
-│   └── repo_analysis.py # Layer 5 (★ Aider Repo Map)
-├── symbols.py           # ★ SymbolTag, SymbolExtractor
-├── depgraph.py          # ★ DependencyGraph
-├── ranker.py            # ★ RelevanceRanker
-├── budget.py            # ★ BudgetFitter
-├── renderer.py          # ★ CompactCodeRenderer
-└── tag_cache.py         # ★ TagCache (diskcache + mtime)
-
-config/queries/           # ★ tree-sitter .scm 查询文件
-├── python-tags.scm
-├── javascript-tags.scm
-├── typescript-tags.scm
-└── ...  (从 Aider 的 queries/ 目录复用)
+insightor/processing/
+├── file_filter.py        # FileFilter
+├── language_detector.py  # LanguageDetector
+├── token_estimator.py    # TokenEstimator
+├── diff_compressor.py    # DiffCompressor
+└── cache_manager.py      # CacheManager
 ```
 
 **测试方式**：
-- 测试 tree-sitter 对主要语言（Python/JS/TS/Go/Java）的符号提取准确性
-- 测试 TagCache 的 mtime 失效和 diskcache 持久化
-- 测试 PageRank 排序结果（PR 文件的相关文件是否排前，get/set 等泛用符号是否降权）
-- 测试 BudgetFitter 二分搜索在不同预算下的选择数量
-- 测试 CompactCodeRenderer 输出的 token 数与实际 token 数的偏差
+- FileFilter: 锁文件/图片/node_modules/vendor/自定义规则 过滤测试
+- LanguageDetector: 语言检测、分组、优先级排序测试
+- TokenEstimator: tiktoken 精确 + fallback 估算测试
+- DiffCompressor: 渐进压缩 + budget 裁剪测试
+- CacheManager: put/get/latest/base 测试
 
 ---
 
@@ -971,55 +876,84 @@ class ImproveParser:
 
 ---
 
-#### PR #10：Composite Output Service + 反馈闭环
+#### PR #10：Composite Output Service — 多路输出基础设施
 
-**标题**：实现组合输出层——多路发布、去重、反馈收集与质量追踪
+**标题**：实现组合输出层——多路发布（终端/Markdown/GitHub/JSON）与去重指纹
 
 **功能描述**：
-CompositeOutputService 将 ReviewResult 同时发布到终端/Markdown/GitHub/JSON。**新增**：FeedbackCollector 从 GitHub Reaction 回读反馈信号，QualityTracker 统计每 category 的历史准确率。
-
-**关键新增（vs V2）**：
-- `FeedbackCollector`：回读 GitHub comment reaction → 更新 Finding.feedback
-- `QualityTracker`：从反馈历史计算每 category 的 precision；将确认的误报模式反馈给 ConfigLoader.safe_patterns
-- `StreamOutput`：流式输出到终端（Rich Live 实时更新）
+建立 Insightor 输出层基础设施。CompositeOutputService 将 ReviewResult 同时发布到终端（Rich 美化）、Markdown 报告文件、GitHub PR 评论、JSON 持久化。FingerprintGenerator 基于 SHA256 对 findings 去重。
 
 **涉及接口**：
 
 ```python
+# ===== OutputService 协议 =====
 class OutputService(Protocol):
     def post(self, result: ReviewResult) -> None: ...
     def flush(self) -> None: ...
 
 class CompositeOutput:
     def __init__(self, services: list[OutputService])
-    def post(self, result: ReviewResult) -> None
+    def post(self, result: ReviewResult) -> None  # 遍历调用
     def flush(self) -> None
+    def add(self, service: OutputService) -> None
 
-class ConsoleOutput(OutputService): ...       # Rich 实时更新
-class MarkdownFileOutput(OutputService): ...
-class GitHubCommentOutput(OutputService): ...  # + reaction 回读
-class JSONOutput(OutputService): ...
+# ===== 四路输出实现 =====
+class ConsoleOutput:           # Rich Panel + Table 美化终端
+class MarkdownFileOutput:      # 结构化 insightor-review-{pr}.md
+class GitHubCommentOutput:     # PyGithub 发布 PR 评论，支持更新已有评论
+class JSONOutput:              # ReviewResult JSON 持久化到 .insightor/reviews/
 
-# ★ v3 新增
+# ===== 去重 =====
+class FingerprintGenerator:
+    @staticmethod
+    def generate(finding) -> str: ...       # SHA256(path|title|category)
+    @staticmethod
+    def deduplicate(findings) -> list: ...  # 按指纹去重
+```
+
+**关键新增**：
+- `OutputService` Protocol + `CompositeOutput` 组合模式
+- `ConsoleOutput`：Rich Panel/Table 美化，severity 颜色分级
+- `MarkdownFileOutput`：生成结构化审查报告（PR 总结 + findings + 合并就绪）
+- `GitHubCommentOutput`：发布/更新 PR 评论，带 bot 签名识别
+- `JSONOutput`：JSON 持久化到 `.insightor/reviews/`
+- `FingerprintGenerator`：SHA256 指纹去重
+- Pipeline 审查完成后自动调用 CompositeOutput（默认 Console + Markdown + JSON）
+- `insightor/output/` 包结构：base.py, console.py, markdown.py, github_comment.py, json_output.py, fingerprint.py
+
+**测试方式**：
+- 18 个单元测试（FingerprintGenerator 5 + CompositeOutput 4 + ConsoleOutput 3 + Markdown 3 + JSON 3）
+- 端到端：`python scripts/review.py <PR_URL>` 验证终端输出 + .md 文件 + .json 文件生成
+
+---
+
+#### PR #11：人机协同审查 + 反馈闭环（计划中）
+
+**标题**：实现人机协同审查工作流——草稿解析、人工确认、反馈收集与质量追踪
+
+**功能描述**：
+在 PR #10 输出层基础上加入人类确认环节。AI 生成 Markdown 审查草稿（含 checkbox 状态标记），人类程序员编辑确认后通过 publish 脚本发布到 GitHub。FeedbackCollector 从 GitHub Reaction 回读反馈信号，QualityTracker 统计每 category 历史准确率。
+
+**涉及接口**：
+
+```python
+class DraftParser:
+    """解析人类编辑后的 Markdown 草稿 → 更新 ReviewResult 的 finding.feedback"""
+    def parse(md_path) -> tuple[ReviewResult, int]: ...
+
 class FeedbackCollector:
     async def collect(self, result: ReviewResult) -> ReviewResult: ...
     async def read_comment_reactions(self, comment_url: str) -> dict[str, str]: ...
-    # 返回 {finding_id: "confirmed"|"false_positive"}
-    def update_safe_patterns(self, false_positives: list[Finding]) -> None: ...
 
 class QualityTracker:
     def track(self, result: ReviewResult) -> None: ...
     def get_precision(self, category: str) -> float: ...
     def export_metrics(self) -> QualityMetrics: ...
-
-class StreamOutput(OutputService):  # ★ v3 新增
-    """流式输出：每收到 StreamEvent 就更新终端"""
-    def on_event(self, event: StreamEvent) -> None: ...
 ```
 
 ---
 
-#### PR #11：CLI 界面与端到端集成
+#### PR #12：CLI 界面与端到端集成
 
 **标题**：实现命令行交互界面，完成全系统端到端集成
 
@@ -1055,7 +989,195 @@ insightor feedback <url> --finding-id abc123 --status false_positive
 
 ---
 
-#### PR #12：Web UI（可选增强）
+### Day 4 — 分层上下文管线 (Context Pipeline)
+
+---
+
+#### PR #13：Context Pipeline 框架 + Layer 1-2
+
+**标题**：实现分层上下文管线框架——Diff 上下文与文件上下文扩展
+
+**功能描述**：
+建立分层上下文管线基础框架。实现 Layer 1（Diff 上下文源）和 Layer 2（文件上下文扩展——import 解析、hunk ±N 行扩展）。定义 ContextSource 协议、ContextChunk、AssembledContext 数据结构。
+
+**涉及接口**：
+
+```python
+# ===== 协议与数据结构 =====
+class ContextSource(Protocol):
+    name: str; layer: int
+    async def fetch(self, pr_info, files) -> ContextChunk: ...
+
+@dataclass
+class ContextChunk:
+    source_name: str
+    content: str
+    metadata: dict  # {tokens, related_files, issues, ...}
+
+@dataclass
+class AssembledContext:
+    chunks: list[ContextChunk]
+    total_tokens: int
+    remaining_budget: int
+    summary: ContextSummary
+
+# ===== Layer 1: Diff 上下文 =====
+class DiffContextSource:
+    name = "diff"; layer = 1
+    async def fetch(self, pr_info, files) -> ContextChunk: ...
+
+# ===== Layer 2: 文件上下文扩展 =====
+class FileContextSource:
+    name = "file_context"; layer = 2
+    async def fetch(self, pr_info, files) -> ContextChunk: ...
+    # 每个 hunk ±N 行上下文 + import 语句解析
+
+# ===== ContextPipeline 框架 =====
+class ContextPipeline:
+    def __init__(self, sources: list[ContextSource], token_budget: int)
+    async def gather(self, pr_info, files, depth) -> AssembledContext: ...
+    def allocate_budget(self, depth) -> dict[str, int]: ...
+```
+
+**测试方式**：
+- Layer 1: diff 上下文正确组装
+- Layer 2: import 解析准确性；hunk 扩展行数正确
+- ContextPipeline: budget 分配逻辑验证
+
+---
+
+#### PR #14：Layer 3-4 — Issue 关联 + 关联文件发现 (Aider PageRank)
+
+**标题**：实现 Issue 上下文与 Aider 启发式关联文件发现
+
+**功能描述**：
+Layer 3 从 PR 描述提取 Issue 引用 → GitHub Issues API 拉取。Layer 4 使用 tree-sitter 符号提取 + 依赖图 + PageRank 排序发现关联文件，二分搜索 Token 适配，Tree View 骨架渲染。
+
+**涉及接口**：
+
+```python
+# ===== Layer 3: Issue 上下文 =====
+class IssueContextSource:
+    name = "issues"; layer = 3
+    async def fetch(self, pr_info, files) -> ContextChunk: ...
+
+# ===== ★ Aider 启发：符号提取与缓存 =====
+@dataclass
+class SymbolTag:
+    fname: str; rel_fname: str; line: int; name: str
+    kind: str  # "def" | "ref"
+
+class SymbolExtractor:
+    """tree-sitter 符号提取器"""
+    def extract_file(self, fname: str) -> list[SymbolTag]: ...
+    def extract_from_diff(self, files) -> list[SymbolTag]: ...
+    def get_modified_symbols(self, diff_files) -> set[str]: ...
+
+class TagCache:
+    """mtime 驱动的增量符号缓存 (diskcache)"""
+    def get(self, fname: str) -> list[SymbolTag] | None: ...
+    def put(self, fname: str, tags: list[SymbolTag]) -> None: ...
+
+# ===== ★ Aider 启发：依赖图与排序 =====
+class DependencyGraph:
+    """文件级符号依赖图 (nx.MultiDiGraph)"""
+    def add_tags(self, tags: list[SymbolTag]) -> None: ...
+    def build_edges(self) -> None:
+        """权重乘数: PR引用=50x, 复合名=10x, 私有=0.1x, 泛用=0.1x"""
+
+class RelevanceRanker:
+    """个性化 PageRank 文件相关性排序"""
+    def rank(self, pr_files, mentioned_idents, dependency_map) -> list[tuple[str, str, float]]: ...
+
+class BudgetFitter:
+    """二分搜索 Token 预算内最优符号集合"""
+    def fit(self, ranked: list, budget: int, renderer) -> str: ...
+
+class CompactCodeRenderer:
+    """紧凑 Tree View 渲染"""
+    def render(self, items, context_lines=3) -> str: ...
+
+# ===== Layer 4: 关联文件 =====
+class RelatedFileSource:
+    name = "related_files"; layer = 4
+    # 使用 PageRank 算法发现关联文件
+    async def fetch(self, pr_info, files) -> ContextChunk: ...
+```
+
+**测试方式**：
+- tree-sitter 符号提取准确性（Python/JS/TS）
+- TagCache mtime 失效和 diskcache 持久化
+- PageRank 排序结果（PR 文件排前、泛用符号降权）
+- BudgetFitter 二分搜索选择数量
+- CompactCodeRenderer token 数偏差
+
+---
+
+#### PR #15：Layer 5 — 仓库结构分析 (Aider Repo Map)
+
+**标题**：实现仓库结构分析层——AST 仓库地图与项目约定检测
+
+**功能描述**：
+Layer 5 对全仓库进行 AST 分析，生成仓库地图。包含：全仓库符号索引、影响范围分析、项目约定检测（.insightor.yml 中的 conventions 自动校验）、对外 API 调用方发现。
+
+**涉及接口**：
+
+```python
+# ===== Layer 5: 仓库分析 =====
+class RepoAnalysisSource:
+    name = "repo_analysis"; layer = 5
+    async def fetch(self, pr_info, files) -> ContextChunk: ...
+    # 1. Git clone / 本地仓库访问
+    # 2. tree-sitter 全仓库符号提取
+    # 3. 仓库地图生成
+    # 4. 影响范围分析
+    # 5. 项目约定检测
+```
+
+**测试方式**：
+- 仓库地图生成完整性
+- 影响范围分析准确性
+- 约定检测覆盖
+
+---
+
+#### PR #16：Context Pipeline 集成
+
+**标题**：将分层上下文管线接入 Review Pipeline
+
+**功能描述**：
+将 PR #13-15 的 Context Pipeline 集成到 ReviewPipeline.run() 中。按 AnalysisDepth 控制启用层（quick: L1/L2, standard: L1-L4, deep: L1-L5）。context_summary 填充到 ReviewResult。Token 预算自动分配。
+
+**涉及接口**：
+
+```python
+class ReviewPipeline:
+    async def run(self, pr_url, tool, depth, ...) -> ReviewResult:
+        # Step 2.5: 构建上下文
+        ctx_pipeline = ContextPipeline(sources=[...], token_budget=...)
+        assembled = await ctx_pipeline.gather(pr_info, files, depth)
+        # assembled.chunks → 注入 prompt
+        # assembled.summary → context_summary 字段
+```
+
+**由 AnalysisDepth 控制启用层**：
+
+```
+            L1  L2  L3  L4  L5
+quick       ✅  ✅
+standard    ✅  ✅  ✅  ✅
+deep        ✅  ✅  ✅  ✅  ✅
+```
+
+**测试方式**：
+- quick/standard/deep 三层上下文正确启用
+- context_summary 字段完整填充
+- Token 预算不超限
+- 端到端：`python scripts/review.py <PR_URL> --depth deep` 验证多层上下文效果
+
+---
+
+#### PR #17：Web UI（可选增强）
 
 **标题**：实现基于 FastAPI + SSE 的 Web 界面，支持流式实时展示
 
@@ -1065,7 +1187,7 @@ insightor feedback <url> --finding-id abc123 --status false_positive
 
 ---
 
-#### PR #13：文档与集成测试
+#### PR #18：文档与集成测试
 
 **标题**：编写项目文档、架构设计说明、模型/上下文/质量设计思路与端到端测试
 
@@ -1100,13 +1222,24 @@ PR #1 (工程 + 配置 + URF v3)  ← 基础，所有 PR 依赖
     │     │           │           │
     │     └───────────┼───────────┘
     │                 │
-    │           PR #10 (Output + 反馈) ← ★ 增强
+    │           PR #10 (Output 基础)
     │                 │
-    │           PR #11 (CLI)
+    │           PR #11 (人机协同 + 反馈) ← ★ 增强
     │                 │
-    │           PR #12 (Web UI, 可选)
+    │           PR #12 (CLI)
     │                 │
-    │           PR #13 (文档 + 集成测试)
+    │     ┌───────────┼───────────┐
+    │     │           │           │
+    │  PR #13      PR #14     PR #15
+    │ (Ctx L1-2)  (Ctx L3-4) (Ctx L5)
+    │     │           │           │
+    │     └───────────┼───────────┘
+    │                 │
+    │           PR #16 (Ctx 集成)
+    │                 │
+    │           PR #17 (Web UI, 可选)
+    │                 │
+    │           PR #18 (文档 + 集成测试)
     │
     └── PR #4 (AI 客户端 + 流式)  ← ★ 增强
           │
@@ -1121,7 +1254,7 @@ PR #1 (工程 + 配置 + URF v3)  ← 基础，所有 PR 依赖
 |------|----------|------|
 | V1 | 基础 5 层架构 (12 PR) | PR-Agent |
 | V2 | URF、CompositeOutput、Parser 适配器、分析深度、指纹去重、CI 抽象 (13 PR) | Reviewdog |
-| V3 | 分层上下文管线、反馈闭环、增量审查、Merge Readiness、流式输出、自定义规则、质量度量 (13 PR, scope 增强) | 需求审计 + Aider + Sourcegraph (待补充) |
+| V3 | 分层上下文管线、反馈闭环、增量审查、Merge Readiness、流式输出、自定义规则、质量度量 (18 PR, scope 增强) | 需求审计 + Aider + Sourcegraph (待补充) |
 
 ---
 
@@ -1129,6 +1262,8 @@ PR #1 (工程 + 配置 + URF v3)  ← 基础，所有 PR 依赖
 
 | 天数 | PR | 内容 | 预估耗时 |
 |------|-----|------|---------|
-| **Day 1** | #1, #2, #3, #4 | 基础层：工程+URF+Provider+Diff+ContextPipeline+AI | 7-9h |
-| **Day 2** | #5, #6, #7, #8 | 核心引擎：Prompt+StreamParser+管线+总结+风险+MR | 7-9h |
-| **Day 3** | #9, #10, #11, #12(可选), #13 | 特性完善：建议+Output+CLI+Web+文档 | 7-9h |
+| **Day 1** | #1, #2, #3, #4 | 基础层：工程+URF+Provider+Diff处理+AI | 7-9h |
+| **Day 2** | #5, #6, #7, #8 | 核心引擎：Prompt+Parser+管线+总结+风险+MR | 7-9h |
+| **Day 3** | #9, #10, #11 | 特性完善：建议+Output+人机协同+反馈 | 7-9h |
+| **Day 4** | #12, #13, #14, #15, #16 | Context Pipeline + CLI：分层上下文(5层)+集成 | 7-9h |
+| **Day 5** | #17(可选), #18 | 产品化：Web+文档 | 4-6h |
