@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from ai_reviewer.reviewer import PRReviewer
+from ai_reviewer.github_commenter import GitHubCommenter
 
 
 def main():
@@ -16,21 +17,33 @@ def main():
         epilog="""
 示例:
   # 评审指定 PR
-  python main.py --owner qyw23AI --repo Insightor --pr 1
+  python main.py --owner SCU-GuGuGaGa --repo Insightor --pr 1
 
   # 通过 URL 评审
-  python main.py --url https://github.com/qyw23AI/Insightor/pull/1
+  python main.py --url https://github.com/SCU-GuGuGaGa/Insightor/pull/1
 
   # 执行安全审查
-  python main.py --owner qyw23AI --repo Insightor --pr 1 --type security
+  python main.py --owner SCU-GuGuGaGa --repo Insightor --pr 1 --type security
 
   # 保存报告到文件
-  python main.py --owner qyw23AI --repo Insightor --pr 1 --output report.md
+  python main.py --owner SCU-GuGuGaGa --repo Insightor --pr 1 --output report.md
 
   # 指定本地仓库路径（可读取完整文件内容）
-  python main.py --owner qyw23AI --repo Insightor --pr 1 --repo-path ./
+  python main.py --owner SCU-GuGuGaGa --repo Insightor --pr 1 --repo-path ./
         """
     )
+
+    #示例 5：发布总结评论到 GitHub
+    #python main.py --owner SCU-GuGuGaGa --repo Insightor --pr 1 --post-comment
+
+    # 示例 6：发布完整评审报告到 GitHub
+    # python main.py --owner SCU-GuGuGaGa --repo Insightor --pr 1 --post-comment --comment-type full
+
+    # 示例 7：分别发布各类型评审结果
+    # python main.py --owner SCU-GuGuGaGa --repo Insightor --pr 1 --type comprehensive security --post-comment --comment-type separate
+
+    # 示例 8：完整流程（多类型评审 + 保存报告 + 发布评论）
+    # python main.py --owner SCU-GuGuGaGa --repo Insightor --pr 1 --type comprehensive security performance --output report.md --post-comment --comment-type summary
 
     # PR 信息参数
     pr_group = parser.add_mutually_exclusive_group(required=True)
@@ -91,6 +104,20 @@ def main():
         help='最大输出 token 数（默认: 4096）'
     )
 
+    # GitHub 评论参数
+    parser.add_argument(
+        '--post-comment',
+        action='store_true',
+        help='将评审结果发布到 GitHub PR'
+    )
+    parser.add_argument(
+        '--comment-type',
+        type=str,
+        choices=['summary', 'full', 'separate'],
+        default='summary',
+        help='评论类型: summary(总结), full(完整), separate(分离) (默认: summary)'
+    )
+
     args = parser.parse_args()
 
     # 验证参数
@@ -135,6 +162,26 @@ def main():
                 if review_type != 'summary':
                     print(f"\n## {review_type.upper()}\n")
                     print(content)
+
+        # 发布评论到 GitHub（如果指定）
+        if args.post_comment:
+            print("\n" + "=" * 60)
+            print("📤 发布评论到 GitHub PR")
+            print("=" * 60)
+
+            commenter = GitHubCommenter()
+            success = commenter.post_review_comment(
+                owner=args.owner,
+                repo=args.repo,
+                pr_number=args.pr,
+                review_result=result,
+                comment_type=args.comment_type
+            )
+
+            if success:
+                print(f"✅ 评论已成功发布到 PR #{args.pr}")
+            else:
+                print("⚠️  评论发布失败，请查看上面的错误信息")
 
         return 0
 
