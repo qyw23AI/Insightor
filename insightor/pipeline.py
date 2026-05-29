@@ -13,7 +13,7 @@ from typing import Callable, Optional
 
 from insightor.ai.litellm_handler import LiteLLMHandler
 from insightor.ai.prompt_builder import PromptBuilder
-from insightor.ai.response_parser import ResponseParser
+from insightor.ai.response_parser import ResponseParser, DescribeParser
 from insightor.config.loader import config
 from insightor.processing.cache_manager import CacheManager
 from insightor.processing.diff_compressor import DiffCompressor
@@ -107,6 +107,9 @@ class ReviewPipeline:
         commit_text = "\n".join(
             f"{c.sha[:8]} {c.message.split(chr(10))[0][:60]}" for c in commits[:5]
         )
+        file_list = "\n".join(
+            f"  [{f.edit_type.value}] {f.filename}" for f in sorted_files[:30]
+        )
         system, user = builder.build(tool, {
             "title": info.title,
             "description": info.description,
@@ -118,6 +121,7 @@ class ReviewPipeline:
             "files_changed": info.files_changed,
             "diff": compressed.text,
             "commit_messages": commit_text,
+            "file_list": file_list,
             "custom_rules": config.get_rules(),
             "focus_categories": config.get_focus_categories(),
         })
@@ -146,14 +150,17 @@ class ReviewPipeline:
             is_incremental=incremental,
             context_layers=["diff"],
         )
-        result = ResponseParser.parse(resp.content, meta)
+        result = DescribeParser.parse(resp.content, meta) if tool == "describe" else ResponseParser.parse(resp.content, meta)
 
         # Step 7: 缓存结果
         self._progress(on_progress, "正在保存结果...")
         cm = CacheManager(cache_root=self.cache_dir)
         cm.put(pr_url, info.commit_sha, result)
 
-        self._progress(on_progress, f"分析完成 ({len(result.findings)} 个发现)")
+        if tool == "describe":
+            self._progress(on_progress, f"分析完成 ({len(result.file_walkthrough)} 个文件)")
+        else:
+            self._progress(on_progress, f"分析完成 ({len(result.findings)} 个发现)")
         return result
 
     # ------------------------------------------------------------------

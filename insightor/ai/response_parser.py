@@ -100,6 +100,46 @@ class ResponseParser:
         )
 
 
+class DescribeParser:
+    """将 AI 返回的描述 JSON 解析为 ReviewResult。
+
+    处理 describe 工具的 JSON 格式:
+      { pr_type, overview, files: [{path, change}], diagram }
+    """
+
+    @staticmethod
+    def parse(raw: str, meta: ReviewMeta) -> ReviewResult:
+        data = _extract_json(raw)
+        return DescribeParser.from_dict(data, meta)
+
+    @staticmethod
+    def from_dict(data: dict, meta: ReviewMeta) -> ReviewResult:
+        pr_type = data.get("pr_type", "")
+        overview = data.get("overview", "")
+        diagram = data.get("diagram", "")
+
+        summary = PRSummary(
+            pr_type=pr_type,
+            overview=overview,
+            files_changed=meta.files_analyzed,
+            diagram=diagram,
+        )
+
+        walkthrough: list[FileWalkthrough] = []
+        for fw in data.get("files", []):
+            walkthrough.append(FileWalkthrough(
+                path=fw.get("path", ""),
+                edit_type=_str_to_edit_type(fw.get("change", "modified")),
+                summary=fw.get("change", ""),
+            ))
+
+        return ReviewResult(
+            meta=meta,
+            summary=summary,
+            file_walkthrough=walkthrough,
+        )
+
+
 # =============================================================================
 # 内部辅助
 # =============================================================================
