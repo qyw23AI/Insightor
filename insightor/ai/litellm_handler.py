@@ -81,8 +81,9 @@ class LiteLLMHandler:
                 )
             return AIResponse(finish_reason="error", duration_ms=int((time.time() - t0) * 1000))
 
+        content = _extract_content(response)
         return AIResponse(
-            content=response.get("content", "") or "",
+            content=content,
             model=response.get("model", resolved),
             finish_reason=response.get("finish_reason", "stop"),
             usage=TokenUsage(
@@ -190,8 +191,9 @@ class LiteLLMHandler:
                     temperature=temperature, max_tokens=max_tokens,
                     stream=False,
                 )
+                content = _extract_content(response)
                 return AIResponse(
-                    content=response.get("content", "") or "",
+                    content=content,
                     model=response.get("model", resolved),
                     finish_reason=response.get("finish_reason", "stop"),
                     usage=TokenUsage(
@@ -235,3 +237,43 @@ class LiteLLMHandler:
             msgs.append({"role": "system", "content": system_prompt})
         msgs.append({"role": "user", "content": user_prompt})
         return msgs
+
+
+def _extract_content(response) -> str:
+    """从 litellm 响应中提取文本内容。
+
+    litellm 返回的完整结构:
+      {"choices": [{"message": {"content": "...", "role": "assistant"}}], ...}
+    DeepSeek reasoning 模型可能还有 reasoning_content 字段。
+    """
+    # 1. 标准路径: choices[0].message.content
+    try:
+        choices = response.get("choices", [])
+        if choices:
+            msg = choices[0].get("message", {})
+            content = msg.get("content", "")
+            # DeepSeek reasoning 模型：如果 content 为空，取 reasoning_content
+            if not content:
+                content = msg.get("reasoning_content", "")
+            if content:
+                return content
+    except (IndexError, AttributeError, KeyError):
+        pass
+
+    # 2. 顶部 content 字段 (某些简化模式)
+    if response.get("content"):
+        return response["content"]
+
+    # 3. 尝试直接访问 (ModelResponse 对象)
+    try:
+        choice = response.choices[0]
+        if hasattr(choice, "message"):
+            content = choice.message.content or ""
+            if not content and hasattr(choice.message, "reasoning_content"):
+                content = choice.message.reasoning_content or ""
+            if content:
+                return content
+    except Exception:
+        pass
+
+    return ""
