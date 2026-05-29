@@ -58,18 +58,22 @@ async def main():
 
     # 4. 调用 LLM
     print("[4/5] AI 分析中...")
+    # 使用 v4-flash: 无推理模式, 直接输出 JSON
+    # v4-pro 会消耗大量 token 做思维链推理, 适合复杂逻辑分析
     handler = LiteLLMHandler(timeout=120, fallback_models=["deepseek-v4-flash"])
     resp = await handler.chat_completion(
-        model="deepseek-v4-pro",
+        model="deepseek-v4-flash",
         system_prompt=system,
         user_prompt=user,
         temperature=0.3,
-        max_tokens=2048,
+        max_tokens=4096,
     )
     print(f"  模型: {resp.model}  耗时: {resp.duration_ms}ms")
     print(f"  Token: {resp.usage.prompt_tokens}+{resp.usage.completion_tokens}={resp.usage.total_tokens}")
-    # debug: 看 LLM 原始返回的前 500 字符
-    print(f"  原始响应前500字: {resp.content[:500]}")
+    # debug: 看 LLM 原始返回
+    print(f"  响应长度: {len(resp.content)} chars")
+    print(f"  前200字: {resp.content[:200]}")
+    print(f"  后300字: {resp.content[-300:]}")
 
     # 5. 解析结果
     print("[5/5] 解析结果...")
