@@ -7,7 +7,7 @@ from insightor.config.loader import ConfigLoader
 class TestConfigLoader:
     def test_loads_defaults(self):
         loader = ConfigLoader()
-        assert loader.get("models.primary") == "claude-sonnet-4-6"
+        assert loader.get("models.primary") == "deepseek-v4-pro"
         assert loader.get("review.min_severity") == "medium"
 
     def test_default_on_missing_key(self):
@@ -35,5 +35,5 @@ class TestConfigLoader:
     def test_cli_none_ignored(self):
         loader = ConfigLoader()
         loader.apply_cli_args(**{"models.primary": None, "review.min_severity": "high"})
-        assert loader.get("models.primary") == "claude-sonnet-4-6"  # unchanged
+        assert loader.get("models.primary") == "deepseek-v4-pro"  # unchanged
         assert loader.get("review.min_severity") == "high"  # changed

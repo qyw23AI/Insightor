@@ -7,10 +7,10 @@
 # AI 模型
 # ---------------------------------------------------------------------------
 [models]
-primary = "claude-sonnet-4-6"
-fallback = ["deepseek-v3", "gpt-4o"]
-weak = "gpt-4o-mini"
-reasoning = "claude-sonnet-4-6"
+primary = "deepseek-v4-pro"
+fallback = ["deepseek-v4-flash"]
+weak = "deepseek-v4-flash"
+reasoning = "deepseek-v4-pro"
 temperature = 0.2
 max_tokens = 4096
 timeout_seconds = 120
