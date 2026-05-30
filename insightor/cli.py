@@ -98,20 +98,21 @@ async def _review(pr_url, depth, incremental, model, debug):
     type=click.Choice(["quick", "standard", "deep"]),
     help="分析深度"
 )
+@click.option("--model", default=None, help="覆盖默认模型")
 @click.option("--debug", is_flag=True, help="打印中间数据后退出")
-def describe(pr_url, depth, debug):
+def describe(pr_url, depth, model, debug):
     """Generate a structured PR description with file walkthrough."""
-    asyncio.run(_describe(pr_url, depth, debug))
+    asyncio.run(_describe(pr_url, depth, model, debug))
 
 
-async def _describe(pr_url, depth, debug):
+async def _describe(pr_url, depth, model, debug):
     from insightor.pipeline import ReviewPipeline
 
     if debug:
         await _debug_tool(pr_url, "describe", depth)
         return
 
-    pipeline = ReviewPipeline()
+    pipeline = ReviewPipeline(model=model) if model else ReviewPipeline()
 
     with console.status("[bold green]Insightor 分析中...") as status:
         def progress(msg):
@@ -141,20 +142,21 @@ async def _describe(pr_url, depth, debug):
     help="分析深度"
 )
 @click.option("--focus", default=None, help="关注领域: security, performance, concurrency 等")
+@click.option("--model", default=None, help="覆盖默认模型")
 @click.option("--debug", is_flag=True, help="打印中间数据后退出")
-def risks(pr_url, depth, focus, debug):
+def risks(pr_url, depth, focus, model, debug):
     """Identify security, concurrency, and performance risks in a PR."""
-    asyncio.run(_risks(pr_url, depth, focus, debug))
+    asyncio.run(_risks(pr_url, depth, focus, model, debug))
 
 
-async def _risks(pr_url, depth, focus, debug):
+async def _risks(pr_url, depth, focus, model, debug):
     from insightor.pipeline import ReviewPipeline
 
     if debug:
         await _debug_tool(pr_url, "risks", depth)
         return
 
-    pipeline = ReviewPipeline()
+    pipeline = ReviewPipeline(model=model) if model else ReviewPipeline()
 
     with console.status("[bold green]Insightor 风险分析中...") as status:
         def progress(msg):
@@ -198,17 +200,18 @@ async def _risks(pr_url, depth, focus, debug):
 @click.option("--skip", "-s", multiple=True,
               type=click.Choice(["describe", "risks", "review"]),
               help="跳过指定工具 (可多次使用)")
+@click.option("--model", default=None, help="覆盖默认模型")
 @click.option("--debug", is_flag=True, help="打印中间数据后退出")
-def full(pr_url, depth, skip, debug):
+def full(pr_url, depth, skip, model, debug):
     """Run complete analysis: describe + risks + review.
 
     Generates a combined Markdown report with clear sections for each tool.
     The review section has feedback checkboxes for human-in-the-loop publishing.
     """
-    asyncio.run(_full(pr_url, depth, set(skip), debug))
+    asyncio.run(_full(pr_url, depth, set(skip), model, debug))
 
 
-async def _full(pr_url, depth, skip, debug):
+async def _full(pr_url, depth, skip, model, debug):
     if debug:
         console.print("[bold yellow]DEBUG MODE — full[/bold yellow]")
         for tool in ["describe", "risks", "review"]:
@@ -231,7 +234,7 @@ async def _full(pr_url, depth, skip, debug):
     tools = ["describe", "risks", "review"]
     results: dict[str, ReviewResult] = {}
     total_ms = 0
-    pipeline = ReviewPipeline()
+    pipeline = ReviewPipeline(model=model) if model else ReviewPipeline()
 
     for tool in tools:
         if tool in skip:
@@ -370,6 +373,28 @@ def _build_full_markdown(merged, results, pr_url, pr_num):
                 cur = 0
         return '`' * max(3, max_run + 1)
 
+    def _render_code_block(label, code_text):
+        """Render a code block, stripping any existing fence from the LLM output.
+
+        If code_text already starts with a markdown code fence, strip it before
+        wrapping to avoid nested fences that break formatting.
+        """
+        import re
+        text = code_text.strip()
+        # Strip leading ```lang or ```` lines
+        text = re.sub(r'^`{3,}\w*\s*\n?', '', text)
+        # Strip trailing ``` or ````
+        text = re.sub(r'\n?`{3,}\s*$', '', text)
+        text = text.strip()
+        if not text:
+            return
+        lines.append(f"- **{label}**:")
+        fc = _fence(text)
+        lines.append(f"  {fc}")
+        for line in text.split('\n'):
+            lines.append(f"  {line}")
+        lines.append(f"  {fc}")
+
     # Section 2: risks
     risks_r = results.get("risks")
     if risks_r:
@@ -430,17 +455,9 @@ def _build_full_markdown(merged, results, pr_url, pr_num):
                     lines.append(f"- **说明**: {f.description}")
                 if f.suggestion:
                     if f.suggestion.current_code:
-                        lines.append(f"- **当前代码**:")
-                        fc = _fence(f.suggestion.current_code)
-                        lines.append(f"  {fc}")
-                        lines.append(f"  {f.suggestion.current_code}")
-                        lines.append(f"  {fc}")
+                        _render_code_block("当前代码", f.suggestion.current_code)
                     if f.suggestion.suggested_code:
-                        lines.append(f"- **建议代码**:")
-                        fc = _fence(f.suggestion.suggested_code)
-                        lines.append(f"  {fc}")
-                        lines.append(f"  {f.suggestion.suggested_code}")
-                        lines.append(f"  {fc}")
+                        _render_code_block("建议代码", f.suggestion.suggested_code)
                 if f.confidence:
                     lines.append(f"- **置信度**: {f.confidence:.0%}")
                 # Feedback checkboxes
