@@ -3,6 +3,7 @@ AI 代码评审工具 - 命令行入口
 """
 import argparse
 import sys
+import os
 from pathlib import Path
 
 from ai_reviewer.reviewer import PRReviewer
@@ -31,6 +32,18 @@ def main():
   python main.py --owner qyw23AI --repo Insightor --pr 1 --repo-path ./
         """
     )
+
+ #示例 5：发布总结评论到 GitHub
+    #python main.py --owner SCU-GuGuGaGa --repo Insightor --pr 1 --post-comment
+
+    # 示例 6：发布完整评审报告到 GitHub
+    # python main.py --owner SCU-GuGuGaGa --repo Insightor --pr 1 --post-comment --comment-type full
+
+    # 示例 7：分别发布各类型评审结果
+    # python main.py --owner SCU-GuGuGaGa --repo Insightor --pr 1 --type comprehensive security --post-comment --comment-type separate
+
+    # 示例 8：完整流程（多类型评审 + 保存报告 + 发布评论）
+    # python main.py --owner SCU-GuGuGaGa --repo Insightor --pr 1 --type comprehensive security performance --output report.md --post-comment --comment-type summary
 
     # PR 信息参数
     pr_group = parser.add_mutually_exclusive_group(required=True)
@@ -90,6 +103,12 @@ def main():
         default=4096,
         help='最大输出 token 数（默认: 4096）'
     )
+    parser.add_argument(
+        '--post-comment',
+        type=str,
+        choices=['summary', 'full', 'separate'],
+        help='自动发布评审到 GitHub PR（summary|full|separate）'
+    )
 
     args = parser.parse_args()
 
@@ -135,6 +154,27 @@ def main():
                 if review_type != 'summary':
                     print(f"\n## {review_type.upper()}\n")
                     print(content)
+
+        # 如果要求发布到 GitHub，则尝试调用 commenter
+        if args.post_comment:
+            try:
+                from ai_reviewer.github_commenter import post_review_comment
+
+                # 从 result 中提取 owner/repo/pr
+                pr_info = result.get('pr_info', {})
+                owner = pr_info.get('owner') or os.getenv('OWNER')
+                repo = pr_info.get('repo') or os.getenv('REPO')
+                pr_number = pr_info.get('number')
+                token = os.getenv('GITHUB_TOKEN')
+
+                if not (owner and repo and pr_number):
+                    print('⚠️  无法解析 PR 信息，跳过发布到 GitHub')
+                else:
+                    ok = post_review_comment(owner, repo, pr_number, result, args.post_comment, token)
+                    if not ok:
+                        print('⚠️  发布评论到 GitHub 失败，请检查 token 与权限')
+            except Exception as e:
+                print(f'✗ 发布评论时出错: {e}')
 
         return 0
 

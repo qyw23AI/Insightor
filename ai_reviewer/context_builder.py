@@ -43,6 +43,11 @@ class ContextBuilder:
 
     def _extract_pr_info(self, pr_data: dict) -> dict:
         """提取 PR 基本信息"""
+        # Attempt to extract owner/repo from the PR payload
+        base_repo = pr_data.get('base', {}).get('repo', {})
+        owner = base_repo.get('owner', {}).get('login') if base_repo else None
+        repo = base_repo.get('name') if base_repo else None
+
         return {
             'number': pr_data.get('number'),
             'title': pr_data.get('title'),
@@ -53,6 +58,8 @@ class ContextBuilder:
             'state': pr_data.get('state'),
             'created_at': pr_data.get('created_at'),
             'updated_at': pr_data.get('updated_at'),
+            'owner': owner,
+            'repo': repo,
         }
 
     def _process_files(self, files_data: list) -> list:
