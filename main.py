@@ -3,6 +3,7 @@ AI 代码评审工具 - 命令行入口
 """
 import argparse
 import sys
+import os
 from pathlib import Path
 
 from ai_reviewer.reviewer import PRReviewer
@@ -102,6 +103,12 @@ def main():
         type=int,
         default=4096,
         help='最大输出 token 数（默认: 4096）'
+    )
+    parser.add_argument(
+        '--post-comment',
+        type=str,
+        choices=['summary', 'full', 'separate'],
+        help='自动发布评审到 GitHub PR（summary|full|separate）'
     )
 
     # GitHub 评论参数

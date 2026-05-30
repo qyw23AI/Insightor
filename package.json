@@ -1,0 +1,114 @@
+{
+  "name": "insightor",
+  "displayName": "Insightor - AI Code Reviewer",
+  "description": "AI-powered code review tool for GitHub Pull Requests using Claude",
+  "version": "0.1.1",
+  "publisher": "codingNow",
+  "icon": "img/plugin.png",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SCU-GuGuGaGa/Insightor.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SCU-GuGuGaGa/Insightor/issues"
+  },
+  "homepage": "https://github.com/SCU-GuGuGaGa/Insightor#readme",
+  "keywords": [
+    "ai",
+    "code-review",
+    "github",
+    "pull-request",
+    "claude"
+  ],
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:insightor.reviewPR"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "insightor.reviewPR",
+        "title": "Insightor: Review GitHub PR"
+      },
+      {
+        "command": "insightor.reviewCurrentPR",
+        "title": "Insightor: Review Current Repository PR"
+      },
+      {
+        "command": "insightor.configure",
+        "title": "Insightor: Configure API Keys"
+      }
+    ],
+    "configuration": {
+      "title": "Insightor",
+      "properties": {
+        "insightor.githubToken": {
+          "type": "string",
+          "default": "",
+          "description": "GitHub Personal Access Token"
+        },
+        "insightor.anthropicApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Anthropic API Key"
+        },
+        "insightor.anthropicBaseUrl": {
+          "type": "string",
+          "default": "https://cc-vibe.com",
+          "description": "Anthropic API Base URL"
+        },
+        "insightor.reviewType": {
+          "type": "string",
+          "default": "comprehensive",
+          "enum": [
+            "comprehensive",
+            "security",
+            "performance",
+            "quality"
+          ],
+          "description": "Default review type"
+        },
+        "insightor.autoPostComment": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically post review comments to GitHub PR"
+        },
+        "insightor.commentType": {
+          "type": "string",
+          "default": "summary",
+          "enum": [
+            "summary",
+            "full",
+            "separate"
+          ],
+          "description": "Comment type when posting to GitHub"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile",
+    "lint": "eslint src --ext ts",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.x",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.x",
+    "@typescript-eslint/parser": "^6.x",
+    "eslint": "^8.x",
+    "typescript": "^5.3.0",
+    "@vscode/vsce": "^2.22.0"
+  },
+  "dependencies": {}
+}
