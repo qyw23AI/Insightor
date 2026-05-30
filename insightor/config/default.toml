@@ -1,0 +1,69 @@
+# =============================================================================
+# Insightor 全局默认配置
+# 可通过 .insightor.yml (项目级)、环境变量 INSIGHTOR_*、CLI 参数逐级覆盖
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# AI 模型
+# ---------------------------------------------------------------------------
+[models]
+primary = "deepseek-v4-pro"
+fallback = ["deepseek-v4-flash"]
+weak = "deepseek-v4-flash"
+reasoning = "deepseek-v4-pro"
+temperature = 0.2
+max_tokens = 4096
+timeout_seconds = 120
+max_retries = 3
+# 第三方 API 地址: 在 .env 中设置 OPENAI_API_BASE / ANTHROPIC_API_BASE / DEEPSEEK_API_BASE
+# 或直接传带前缀的模型名 (如 openai/claude-sonnet-4-6) 来指定供应商路由
+
+# ---------------------------------------------------------------------------
+# Git Provider
+# ---------------------------------------------------------------------------
+[provider]
+type = "github"
+token_env = "GITHUB_TOKEN"
+
+# ---------------------------------------------------------------------------
+# Review 默认参数
+# ---------------------------------------------------------------------------
+[review]
+min_severity = "medium"
+max_findings = 20
+suggestions_score_threshold = 5
+focus_categories = ["security", "performance", "logic", "concurrency"]
+require_tests_warning = true
+enable_self_reflection = false
+persistent_comment = true
+incremental = true
+custom_rules = []
+conventions = []
+safe_patterns = []
+
+# ---------------------------------------------------------------------------
+# 上下文管线
+# ---------------------------------------------------------------------------
+[context]
+patch_extra_lines_before = 3
+patch_extra_lines_after = 3
+max_related_files = 10
+related_file_context_lines = 30
+dependency_map = {}
+disabled_layers = []
+
+# ---------------------------------------------------------------------------
+# Token 管理
+# ---------------------------------------------------------------------------
+[token]
+max_input_tokens = 32000
+output_buffer_tokens = 1000
+model_token_count_estimate_factor = 0.7
+
+# ---------------------------------------------------------------------------
+# 输出
+# ---------------------------------------------------------------------------
+[output]
+formats = ["console"]
+output_dir = "."
+cache_dir = ".insightor"
