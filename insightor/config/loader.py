@@ -6,9 +6,11 @@ from typing import Any
 
 import tomllib
 import yaml
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
-load_dotenv()
+# Search .env from CWD first (user's project root), then fall back to module location
+_dotenv_path = find_dotenv(usecwd=True) or find_dotenv()
+load_dotenv(_dotenv_path or ".env", override=True)
 
 
 class ConfigLoader:
