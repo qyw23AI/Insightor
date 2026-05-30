@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 
 from ai_reviewer.reviewer import PRReviewer
+from ai_reviewer.github_commenter import GitHubCommenter
 
 
 def main():
@@ -17,23 +18,23 @@ def main():
         epilog="""
 示例:
   # 评审指定 PR
-  python main.py --owner qyw23AI --repo Insightor --pr 1
+  python main.py --owner SCU-GuGuGaGa --repo Insightor --pr 1
 
   # 通过 URL 评审
-  python main.py --url https://github.com/qyw23AI/Insightor/pull/1
+  python main.py --url https://github.com/SCU-GuGuGaGa/Insightor/pull/1
 
   # 执行安全审查
-  python main.py --owner qyw23AI --repo Insightor --pr 1 --type security
+  python main.py --owner SCU-GuGuGaGa --repo Insightor --pr 1 --type security
 
   # 保存报告到文件
-  python main.py --owner qyw23AI --repo Insightor --pr 1 --output report.md
+  python main.py --owner SCU-GuGuGaGa --repo Insightor --pr 1 --output report.md
 
   # 指定本地仓库路径（可读取完整文件内容）
-  python main.py --owner qyw23AI --repo Insightor --pr 1 --repo-path ./
+  python main.py --owner SCU-GuGuGaGa --repo Insightor --pr 1 --repo-path ./
         """
     )
 
- #示例 5：发布总结评论到 GitHub
+    #示例 5：发布总结评论到 GitHub
     #python main.py --owner SCU-GuGuGaGa --repo Insightor --pr 1 --post-comment
 
     # 示例 6：发布完整评审报告到 GitHub
@@ -110,6 +111,20 @@ def main():
         help='自动发布评审到 GitHub PR（summary|full|separate）'
     )
 
+    # GitHub 评论参数
+    parser.add_argument(
+        '--post-comment',
+        action='store_true',
+        help='将评审结果发布到 GitHub PR'
+    )
+    parser.add_argument(
+        '--comment-type',
+        type=str,
+        choices=['summary', 'full', 'separate'],
+        default='summary',
+        help='评论类型: summary(总结), full(完整), separate(分离) (默认: summary)'
+    )
+
     args = parser.parse_args()
 
     # 验证参数
@@ -155,26 +170,25 @@ def main():
                     print(f"\n## {review_type.upper()}\n")
                     print(content)
 
-        # 如果要求发布到 GitHub，则尝试调用 commenter
+        # 发布评论到 GitHub（如果指定）
         if args.post_comment:
-            try:
-                from ai_reviewer.github_commenter import post_review_comment
+            print("\n" + "=" * 60)
+            print("📤 发布评论到 GitHub PR")
+            print("=" * 60)
 
-                # 从 result 中提取 owner/repo/pr
-                pr_info = result.get('pr_info', {})
-                owner = pr_info.get('owner') or os.getenv('OWNER')
-                repo = pr_info.get('repo') or os.getenv('REPO')
-                pr_number = pr_info.get('number')
-                token = os.getenv('GITHUB_TOKEN')
+            commenter = GitHubCommenter()
+            success = commenter.post_review_comment(
+                owner=args.owner,
+                repo=args.repo,
+                pr_number=args.pr,
+                review_result=result,
+                comment_type=args.comment_type
+            )
 
-                if not (owner and repo and pr_number):
-                    print('⚠️  无法解析 PR 信息，跳过发布到 GitHub')
-                else:
-                    ok = post_review_comment(owner, repo, pr_number, result, args.post_comment, token)
-                    if not ok:
-                        print('⚠️  发布评论到 GitHub 失败，请检查 token 与权限')
-            except Exception as e:
-                print(f'✗ 发布评论时出错: {e}')
+            if success:
+                print(f"✅ 评论已成功发布到 PR #{args.pr}")
+            else:
+                print("⚠️  评论发布失败，请查看上面的错误信息")
 
         return 0
 
