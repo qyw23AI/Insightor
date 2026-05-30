@@ -53,7 +53,7 @@ class ReviewPipeline:
         fallback_models: list[str] | None = None,
         cache_dir: str | None = None,
     ):
-        self.model = model or DEFAULT_MODEL
+        self._model_override = model
         self.fallback_models = fallback_models or config.get("models.fallback", [])
         self.cache_dir = cache_dir or config.get("output.cache_dir", ".insightor")
         self._provider: Optional[GitHubProvider] = None
@@ -212,11 +212,12 @@ class ReviewPipeline:
             return int(MAX_TOKENS * 0.8)
         return int(MAX_TOKENS * 0.5)  # standard
 
-    @staticmethod
-    def _pick_model(depth: AnalysisDepth) -> str:
-        """按分析深度选择模型。"""
+    def _pick_model(self, depth: AnalysisDepth) -> str:
+        """按分析深度选择模型。CLI --model 覆盖一切。"""
+        if self._model_override:
+            return self._model_override
         if depth == AnalysisDepth.QUICK:
             return config.get("models.weak", DEFAULT_MODEL)
         elif depth == AnalysisDepth.DEEP:
             return config.get("models.reasoning", DEFAULT_MODEL)
-        return DEFAULT_MODEL
+        return config.get("models.primary", DEFAULT_MODEL)
