@@ -179,54 +179,13 @@ async def _risks(pr_url, depth, focus, debug):
 
 
 # =============================================================================
-# improve
+# improve — REMOVED (merged into review)
 # =============================================================================
-
-@main.command()
-@click.argument("pr_url")
-@click.option(
-    "--depth", default="standard",
-    type=click.Choice(["quick", "standard", "deep"]),
-    help="分析深度"
-)
-@click.option("--committable-only", is_flag=True, help="仅显示可直接应用的建议")
-@click.option("--debug", is_flag=True, help="打印中间数据后退出")
-def improve(pr_url, depth, committable_only, debug):
-    """Generate code improvement suggestions for a PR."""
-    asyncio.run(_improve(pr_url, depth, committable_only, debug))
-
-
-async def _improve(pr_url, depth, committable_only, debug):
-    from insightor.pipeline import ReviewPipeline
-
-    if debug:
-        await _debug_tool(pr_url, "improve", depth)
-        return
-
-    pipeline = ReviewPipeline()
-
-    with console.status("[bold green]Insightor 代码建议分析中...") as status:
-        def progress(msg):
-            status.update(f"[bold green]{msg}")
-
-        result = await pipeline.run(
-            pr_url=pr_url, tool="improve", depth=depth,
-            on_progress=progress,
-        )
-
-    suggestions = result.findings
-    if committable_only:
-        suggestions = [f for f in suggestions
-                       if f.suggestion and f.suggestion.is_committable]
-
-    console.print(
-        f"\n💡 [bold]{len(suggestions)} 个代码建议[/bold]  "
-        f"({len(result.findings)} 总计)  {result.meta.duration_ms}ms"
-    )
-
+# improve 命令已删除。代码改进建议已整合到 review 工具中。
+# 使用 insightor full 进行完整审查，review 部分包含可勾选的 feedback checkboxes。
 
 # =============================================================================
-# full — run all four tools and produce combined report
+# full — run describe + risks + review and produce combined report
 # =============================================================================
 
 @main.command()
@@ -237,14 +196,14 @@ async def _improve(pr_url, depth, committable_only, debug):
     help="分析深度 (default: standard)"
 )
 @click.option("--skip", "-s", multiple=True,
-              type=click.Choice(["describe", "risks", "improve", "review"]),
+              type=click.Choice(["describe", "risks", "review"]),
               help="跳过指定工具 (可多次使用)")
 @click.option("--debug", is_flag=True, help="打印中间数据后退出")
 def full(pr_url, depth, skip, debug):
-    """Run complete analysis: describe + risks + improve + review.
+    """Run complete analysis: describe + risks + review.
 
     Generates a combined Markdown report with clear sections for each tool.
-    Only the 'improve' section has feedback checkboxes for publishing.
+    The review section has feedback checkboxes for human-in-the-loop publishing.
     """
     asyncio.run(_full(pr_url, depth, set(skip), debug))
 
@@ -252,7 +211,7 @@ def full(pr_url, depth, skip, debug):
 async def _full(pr_url, depth, skip, debug):
     if debug:
         console.print("[bold yellow]DEBUG MODE — full[/bold yellow]")
-        for tool in ["describe", "risks", "improve", "review"]:
+        for tool in ["describe", "risks", "review"]:
             if tool in skip:
                 continue
             console.print(f"\n{'='*60}")
@@ -267,9 +226,9 @@ async def _full(pr_url, depth, skip, debug):
     from insightor.output.fingerprint import FingerprintGenerator
     from insightor.output.json_output import JSONOutput
     from insightor.pipeline import ReviewPipeline
-    from insightor.schemas.urf import FindingType, ReviewResult, Severity
+    from insightor.schemas.urf import ReviewResult
 
-    tools = ["describe", "risks", "improve", "review"]
+    tools = ["describe", "risks", "review"]
     results: dict[str, ReviewResult] = {}
     total_ms = 0
     pipeline = ReviewPipeline()
@@ -284,7 +243,7 @@ async def _full(pr_url, depth, skip, debug):
 
             result = await pipeline.run(
                 pr_url=pr_url, tool=tool, depth=depth,
-                on_progress=progress,
+                on_progress=progress, skip_markdown=True,
             )
         results[tool] = result
         total_ms += result.meta.duration_ms
@@ -297,15 +256,13 @@ async def _full(pr_url, depth, skip, debug):
             mr = result.merge_readiness
             console.print(f"  ⚠️  risks: {len(result.findings)} findings"
                           f"{f' score={mr.score:.0f}' if mr else ''}")
-        elif tool == "improve":
-            console.print(f"  💡 improve: {len(result.findings)} suggestions")
         elif tool == "review":
             mr = result.merge_readiness
             console.print(f"  📋 review: {len(result.findings)} findings"
                           f"{f' score={mr.score:.0f}' if mr else ''}")
 
-    # Merge: use improve's meta as base, combine findings from all tools
-    base = results.get("improve") or results.get("review") or results.get("risks")
+    # Merge: use review's meta as base, combine findings from all tools
+    base = results.get("review") or results.get("risks")
     if not base:
         console.print("[red]No tools were run.[/red]")
         return
@@ -343,16 +300,15 @@ async def _full(pr_url, depth, skip, debug):
     console.print(f"\n[bold green]Full review complete.[/bold green]")
     console.print(f"  describe: {len(describe_r.file_walkthrough) if describe_r else 0} files")
     console.print(f"  risks:    {len(results.get('risks', ReviewResult(meta=base.meta)).findings)} findings")
-    console.print(f"  improve:  {len(results.get('improve', ReviewResult(meta=base.meta)).findings)} suggestions")
     console.print(f"  review:   {len(results.get('review', ReviewResult(meta=base.meta)).findings)} findings")
     console.print(f"  total: {total_ms}ms | {len(deduped)} unique findings (deduplicated)")
     console.print(f"  report: {fname}")
-    console.print(f"\n  Edit [bold]{fname}[/bold] to confirm improve suggestions,")
+    console.print(f"\n  Edit [bold]{fname}[/bold] to confirm review findings,")
     console.print(f"  then run: [bold]insightor publish {fname}[/bold]")
 
 
 def _build_full_markdown(merged, results, pr_url, pr_num):
-    """Build combined markdown with four clear sections. Only improve has checkboxes."""
+    """Build combined markdown with three sections. Review section has checkboxes."""
     from datetime import datetime, timezone
 
     from insightor.schemas.urf import Severity
@@ -447,7 +403,7 @@ def _build_full_markdown(merged, results, pr_url, pr_num):
         lines.append("")
         lines.append("---")
 
-    # Section 3: review
+    # Section 3: review (WITH feedback checkboxes for human-in-the-loop)
     review_r = results.get("review")
     if review_r:
         mr = review_r.merge_readiness
@@ -464,41 +420,6 @@ def _build_full_markdown(merged, results, pr_url, pr_num):
             lines.append(f"### 发现 ({len(review_r.findings)})")
             for i, f in enumerate(review_r.findings, 1):
                 icon = _SEVERITY_ICON.get(f.severity, "")
-                lines.append("")
-                lines.append(f"#### {i}. {icon} [{f.severity.value}] {f.title}")
-                lines.append("")
-                lines.append(f"- **类别**: {f.category}")
-                lines.append(f"- **文件**: `{f.location.path}:{f.location.range.start.line}`")
-                if f.description:
-                    lines.append(f"- **说明**: {f.description}")
-                if f.suggestion:
-                    if f.suggestion.current_code:
-                        lines.append(f"- **当前代码**:")
-                        fc = _fence(f.suggestion.current_code)
-                        lines.append(f"  {fc}")
-                        lines.append(f"  {f.suggestion.current_code}")
-                        lines.append(f"  {fc}")
-                    if f.suggestion.suggested_code:
-                        lines.append(f"- **建议代码**:")
-                        fc = _fence(f.suggestion.suggested_code)
-                        lines.append(f"  {fc}")
-                        lines.append(f"  {f.suggestion.suggested_code}")
-                        lines.append(f"  {fc}")
-                if f.confidence:
-                    lines.append(f"- **置信度**: {f.confidence:.0%}")
-        lines.append("")
-        lines.append("---")
-
-    # Section 4: improve (WITH feedback checkboxes)
-    improve_r = results.get("improve")
-    if improve_r:
-        lines.append("")
-        lines.append("## 4. 代码建议 (improve)")
-        lines.append("")
-        if improve_r.findings:
-            lines.append(f"### 建议 ({len(improve_r.findings)})")
-            for i, f in enumerate(improve_r.findings, 1):
-                icon = "💡"
                 lines.append("")
                 lines.append(f"#### {i}. {icon} [{f.severity.value}] {f.title}"
                              f" <!-- finding-id: {f.id} -->")
@@ -522,7 +443,7 @@ def _build_full_markdown(merged, results, pr_url, pr_num):
                         lines.append(f"  {fc}")
                 if f.confidence:
                     lines.append(f"- **置信度**: {f.confidence:.0%}")
-                # Feedback checkboxes — only for improve
+                # Feedback checkboxes
                 lines.append("")
                 lines.append(f"- [ ] confirmed")
                 lines.append(f"- [ ] false_positive")
@@ -531,7 +452,8 @@ def _build_full_markdown(merged, results, pr_url, pr_num):
                 lines.append(f"- **审查者:** ")
                 lines.append(f"- **备注:** ")
         else:
-            lines.append("无代码建议。")
+            lines.append("")
+            lines.append("无审查发现。")
         lines.append("")
         lines.append("---")
 
@@ -540,7 +462,7 @@ def _build_full_markdown(merged, results, pr_url, pr_num):
     lines.append("")
     lines.append("## 反馈说明")
     lines.append("")
-    lines.append("请根据实际情况勾选以上 **代码建议 (第4节)** 的反馈。确认后运行发布脚本:")
+    lines.append("请根据实际情况勾选以上 **代码审查 (第3节)** 的反馈。确认后运行发布脚本:")
     lines.append("")
     lines.append("```bash")
     lines.append(f"insightor publish insightor-full-review-{pr_num_str}.md")
@@ -621,15 +543,14 @@ async def _publish(md_path, dry_run, json_path):
         console.print("  No feedback changes found. Nothing to publish.")
         return
 
-    # For full review reports, only publish improve (suggestion-type) findings
+    # For full review reports, publish all findings that have feedback
     is_full = "<!-- insightor-full-review -->" in md_text
     if is_full:
-        from insightor.schemas.urf import FindingType
         updated_result.findings = [
             f for f in updated_result.findings
-            if f.type == FindingType.SUGGESTION
+            if f.feedback and f.feedback.status is not None
         ]
-        console.print(f"  Full review detected — publishing improve suggestions only "
+        console.print(f"  Full review detected — publishing findings with feedback "
                        f"({len(updated_result.findings)} items)")
 
     if dry_run:

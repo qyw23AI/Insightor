@@ -13,7 +13,7 @@ from typing import Callable, Optional
 
 from insightor.ai.litellm_handler import LiteLLMHandler
 from insightor.ai.prompt_builder import PromptBuilder
-from insightor.ai.response_parser import ResponseParser, DescribeParser, RisksParser, ImproveParser
+from insightor.ai.response_parser import ResponseParser, DescribeParser, RisksParser
 from insightor.config.loader import config
 from insightor.output.base import CompositeOutput
 from insightor.output.console import ConsoleOutput
@@ -70,15 +70,17 @@ class ReviewPipeline:
         depth: str = "standard",
         incremental: bool = False,
         on_progress: Callable[[str], None] | None = None,
+        skip_markdown: bool = False,
     ) -> ReviewResult:
         """执行完整 review 管线。
 
         Args:
             pr_url: GitHub PR URL
-            tool: 使用的 prompt 模板 (review/describe/risks/improve)
+            tool: 使用的 prompt 模板 (review/describe/risks)
             depth: 分析深度 (quick/standard/deep)
             incremental: 是否增量审查
             on_progress: 步骤进度回调
+            skip_markdown: 跳过 Markdown 文件生成（full 命令自己生成合并报告）
         """
         t_start = time.time()
         self._provider = GitHubProvider()
@@ -158,8 +160,6 @@ class ReviewPipeline:
             result = DescribeParser.parse(resp.content, meta)
         elif tool == "risks":
             result = RisksParser.parse(resp.content, meta)
-        elif tool == "improve":
-            result = ImproveParser.parse(resp.content, meta)
         else:
             result = ResponseParser.parse(resp.content, meta)
 
@@ -170,11 +170,10 @@ class ReviewPipeline:
 
         # Step 8: 输出结果
         self._progress(on_progress, "正在输出结果...")
-        output = CompositeOutput([
-            ConsoleOutput(),
-            MarkdownFileOutput(),
-            JSONOutput(),
-        ])
+        outputs = [ConsoleOutput(), JSONOutput()]
+        if not skip_markdown:
+            outputs.insert(1, MarkdownFileOutput())
+        output = CompositeOutput(outputs)
         output.post(result)
         output.flush()
 
@@ -182,8 +181,6 @@ class ReviewPipeline:
             self._progress(on_progress, f"分析完成 ({len(result.file_walkthrough)} 个文件)")
         elif tool == "risks":
             self._progress(on_progress, f"风险分析完成 ({len(result.findings)} 个发现)")
-        elif tool == "improve":
-            self._progress(on_progress, f"代码建议分析完成 ({len(result.findings)} 个建议)")
         else:
             self._progress(on_progress, f"分析完成 ({len(result.findings)} 个发现)")
         return result

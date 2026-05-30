@@ -59,7 +59,13 @@ class DraftParser:
             except ValueError:
                 continue
 
-            section = "\n".join(lines[i : i + 30])
+            section_lines = lines[i : i + 30]
+            # Stop at the next finding-id marker to avoid bleeding into another finding
+            for j, sl in enumerate(section_lines):
+                if j > 0 and DraftParser.FINDING_ID_RE.search(sl):
+                    section_lines = section_lines[:j]
+                    break
+            section = "\n".join(section_lines)
 
             status: FeedbackStatus | None = None
             for cb_match in DraftParser.CHECKBOX_RE.finditer(section):

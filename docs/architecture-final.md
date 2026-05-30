@@ -23,7 +23,7 @@
 ┌────────────────────────────▼─────────────────────────────────────────────┐
 │  Layer 1: 入口层 (Entry)                                                  │
 │  ┌──────────────────────────────────────────────────────────────────┐   │
-│  │ · CLI (click): insightor review/describe/risks/improve            │   │
+│  │ · CLI (click): insightor full/review/describe/risks/publish            │   │
 │  │ · Web (FastAPI): SSE 流式分析 + Tab 结果展示                       │   │
 │  └──────────────────────────────────────────────────────────────────┘   │
 └────────────────────────────┬─────────────────────────────────────────────┘
@@ -506,7 +506,7 @@ insightor/
 ├── processing/             # Layer 3 (含 ContextPipeline)
 ├── ai/                     # Layer 4
 ├── output/                 # Layer 5 (含 Feedback/Quality)
-└── tools/                  # review/describe/risks/improve
+└── tools/                  # review/describe/risks
 ```
 
 **目录结构**：
@@ -529,7 +529,7 @@ insightor/
 ├── processing/             # Layer 3
 ├── ai/                     # Layer 4
 ├── output/                 # Layer 5
-└── tools/                  # review/describe/risks/improve
+└── tools/                  # review/describe/risks
 ```
 
 **测试方式**：
@@ -852,43 +852,9 @@ class RisksParser:
 
 ---
 
-#### PR #9：Review 建议生成工具 (/improve)
+#### PR #9：Review 建议生成工具 (/improve) — 已合并到 review
 
-**标题**：实现 Review 建议智能生成——代码质量、最佳实践与可应用代码修补建议
-
-**功能描述**：
-自动分析 PR 代码变更，生成可应用的代码改进建议。聚焦代码可维护性、性能优化、设计模式、错误处理。每个建议提供 `current_code`/`suggested_code` 对比和 `is_committable` 标记。
-
-**涉及接口**：
-
-```python
-# ===== 新增 ImproveParser =====
-class ImproveParser:
-    """将 AI 代码建议 JSON 解析为 ReviewResult。"""
-    @staticmethod
-    def parse(raw: str, meta: ReviewMeta) -> ReviewResult: ...
-    @staticmethod
-    def from_dict(data: dict, meta: ReviewMeta) -> ReviewResult:
-        # 兼容 suggestions / findings 两种 key
-        # 解析 current_code/suggested_code → CodeSuggestion(is_committable)
-        # 兼容旧格式: suggestion 为纯文本字符串
-        # overall 存在 → AI 提供值
-        # overall 缺失 → MergeReadinessCalc.calculate() fallback
-        # 构建 PRSummary, file_walkthrough, stats
-```
-
-**关键新增**：
-- `ImproveParser`：解析 improve 输出 JSON（`suggestions[{current_code, suggested_code, is_committable}]`）→ `ReviewResult`
-- 兼容 `findings` key（与 review.toml 格式兼容）
-- 兼容纯文本 `suggestion` 字段（向后兼容旧格式）
-- Pipeline 增加 `tool=="improve"` 分支分发到 ImproveParser
-- `scripts/improve.py`：CLI 入口，支持 `--debug`/`--depth`
-- `insightor/config/prompts/improve.toml`：完善 prompt，含代码质量检查规则、建议输出格式、评分规则
-
-**测试方式**：
-- 7 个 ImproveParser 单元测试（basic、findings_fallback、empty、missing_overall、text_suggestion、files、parse_raw）
-- 1 个 pipeline 分发测试
-- 端到端：`python scripts/improve.py <PR_URL> --debug`
+**状态**：已于 PR #12 后合并到 review 工具。`insightor improve` 命令、`ImproveParser`、`scripts/improve.py`、`improve.toml` 均已移除。代码改进建议能力由 `insightor full` 的 review 部分统一提供，含 feedback checkbox。
 
 ---
 
@@ -1019,7 +985,7 @@ scripts/
 **标题**：实现命令行交互界面，完成全系统端到端集成
 
 **功能描述**：
-基于 click 实现统一的 `insightor` CLI 命令，支持 full/review/describe/risks/improve/publish 六个子命令。`full` 命令一次串联全部四个分析工具，生成四段式组合 Markdown（describe/risks/improve/review），各段内容不重复，仅 improve 段含 feedback checkbox。publish 自动检测 full 报告并只发布 improve 建议。集成 Rich `Console().status()` 实时进度展示，`--debug` 模式打印完整中间数据。`pyproject.toml` 已注册 `insightor = "insightor.cli:main"` 入口点。
+基于 click 实现统一的 `insightor` CLI 命令，支持 full/review/describe/risks/publish 五个子命令。`full` 命令一次串联全部三个分析工具，生成三段式组合 Markdown（describe/risks/review），各段内容不重复，review 段含 feedback checkbox。publish 自动检测 full 报告并发布有 feedback 的 finding。集成 Rich `Console().status()` 实时进度展示，`--debug` 模式打印完整中间数据。`pyproject.toml` 已注册 `insightor = "insightor.cli:main"` 入口点。
 
 **CLI 命令一览**：
 
@@ -1041,9 +1007,8 @@ insightor review <url> --incremental
 # 子命令
 insightor describe <url>               # PR 总结
 insightor risks <url> --focus security # 风险分析
-insightor improve <url> --committable-only  # 代码建议
 
-# 发布已确认审查（full 报告自动只发布 improve）
+# 发布已确认审查
 insightor publish <md_path> --dry-run
 ```
 
@@ -1053,21 +1018,19 @@ insightor publish <md_path> --dry-run
 insightor full <url>
   ├── describe  → PR 总结 + 变更文件表
   ├── risks     → 安全/性能/并发风险发现
-  ├── review    → 代码审查发现
-  └── improve   → 代码改进建议（含 feedback checkbox）
+  └── review    → 代码审查发现（含 feedback checkbox）
        ↓
   FingerprintGenerator 跨工具去重
        ↓
   合并 Markdown: insightor-full-review-{pr}.md
   ├── ## 1. PR 总结 (describe)          — 无 checkbox
   ├── ## 2. 风险分析 (risks)            — 无 checkbox
-  ├── ## 3. 代码审查 (review)           — 无 checkbox
-  ├── ## 4. 代码建议 (improve)          — 有 checkbox ← 唯一可发布段
-  └── ## 反馈说明                        — 仅指向第4节
+  ├── ## 3. 代码审查 (review)           — 有 checkbox ← 人机协同段
+  └── ## 反馈说明                        — 指向第3节
        ↓
   人类编辑第3节 checkbox → insightor publish
        ↓
-  GitHub 评论只含 improve 建议
+  GitHub 评论含所有有 feedback 的 finding
 ```
 
 **涉及接口**：
@@ -1077,12 +1040,11 @@ insightor full <url>
 @click.group()
 def main(): ...
 
-# ==== 子命令 ====
+# ==== 子命令（5 个）====
 @main.command(); def full(pr_url, depth, skip, debug): ...       # ★ 新增
 @main.command(); def review(pr_url, depth, incremental, model, debug): ...
 @main.command(); def describe(pr_url, depth, debug): ...
 @main.command(); def risks(pr_url, depth, focus, debug): ...
-@main.command(); def improve(pr_url, depth, committable_only, debug): ...
 @main.command(); def publish(md_path, dry_run, json_path): ...
 
 # ==== 异步实现 ====
@@ -1090,11 +1052,10 @@ async def _full(pr_url, depth, skip, debug): ...
 async def _review(pr_url, depth, incremental, model, debug): ...
 async def _describe(pr_url, depth, debug): ...
 async def _risks(pr_url, depth, focus, debug): ...
-async def _improve(pr_url, depth, committable_only, debug): ...
 async def _publish(md_path, dry_run, json_path): ...
 
 # ==== Full 辅助 ====
-def _build_full_markdown(merged, results, pr_url, pr_num): ...   # 组装四段式 Markdown
+def _build_full_markdown(merged, results, pr_url, pr_num): ...   # 组装三段式 Markdown
 def _extract_pr_num_from_url(pr_url): ...
 
 # ==== Debug 辅助 ====
@@ -1103,12 +1064,11 @@ async def _debug_tool(pr_url, tool, depth): ...
 ```
 
 **关键新增**：
-- `insightor full`：依次运行 describe → risks → improve → review，`FingerprintGenerator.deduplicate()` 跨工具去重，生成 `insightor-full-review-{pr}.md`（四段式结构，含 `<!-- insightor-full-review -->` 标记）
-- 四段式 Markdown：各段内容独立不重复，仅第4节（improve）含 feedback checkbox 和 `<!-- finding-id: UUID -->` 注释，前3节（describe/risks/review）不含 checkbox，反馈说明只指向第4节
-- publish 增强：检测 `<!-- insightor-full-review -->` 标记 → 自动过滤只保留 `type == FindingType.SUGGESTION` 的 finding → GitHub 评论只含 improve 建议
-- `--skip` 选项：可跳过指定工具，如 `--skip review --skip risks`
+- `insightor full`：依次运行 describe → risks → review，`FingerprintGenerator.deduplicate()` 跨工具去重，生成 `insightor-full-review-{pr}.md`（三段式结构，含 `<!-- insightor-full-review -->` 标记）
+- 三段式 Markdown：各段内容独立不重复，第3节（review）含 feedback checkbox 和 `<!-- finding-id: UUID -->` 注释，前2节（describe/risks）不含 checkbox
+- publish 增强：检测 `<!-- insightor-full-review -->` 标记 → 自动过滤只保留有 feedback 的 finding
+- `--skip` 选项：可跳过指定工具，如 `--skip risks`
 - `_load_original_result` 兼容 `insightor-full-review-{pr}.md` 文件名模式
-- 现有 `scripts/*.py` 保持不变，向后兼容
 
 **实际实现文件**：
 ```
@@ -1117,8 +1077,8 @@ insightor/
 ```
 
 **测试方式**：
-- 25 个 CLI 单元测试（click.testing.CliRunner）：full 帮助/参数/--skip/--debug、full-publish 过滤 improve-only 集成测试、以及原有 review/describe/risks/improve/publish 测试
-- full-publish 集成测试：构造四段式 Markdown + 含 risk+suggestion 的 JSON，验证 publish 后只输出 improve 建议、风险发现被过滤
+- 23 个 CLI 单元测试（click.testing.CliRunner）：full 帮助/参数/--skip/--debug、full-publish 过滤无 feedback 的 finding、以及 review/describe/risks/publish 测试
+- full-publish 集成测试：构造三段式 Markdown + JSON，验证 publish 后只输出有 feedback 的 finding、无 feedback 的被过滤
 - 手动验证：`python -m insightor.cli --help` 显示 full 子命令
 
 ---
@@ -1145,8 +1105,7 @@ VSCode Extension (TypeScript)              Insightor Core (Python)
 │  ├── insightor.review    │               │  insightor review .. │
 │  ├── insightor.describe  │               │  insightor publish . │
 │  ├── insightor.risks     │               └──────────┬───────────┘
-│  ├── insightor.improve   │                          │
-│  └── insightor.publish   │               ┌──────────▼───────────┐
+│  ├── insightor.publish   │               ┌──────────▼───────────┐
 ├─────────────────────────┤               │  ReviewPipeline       │
 │  Webview Panel           │               │  .run(pr_url, tool,   │
 │  ├── 四段式结果展示       │◀──JSON/UDP───│   depth, ...)         │
@@ -1170,7 +1129,6 @@ VSCode Extension (TypeScript)              Insightor Core (Python)
 # insightor review <url> [--depth] [--incremental] [--debug]
 # insightor describe <url> [--depth] [--debug]
 # insightor risks <url> [--depth] [--focus] [--debug]
-# insightor improve <url> [--depth] [--committable-only] [--debug]
 # insightor publish <md_path> [--dry-run] [--json]
 
 # ===== 契约 2: Python API（向后兼容扩展）=====
@@ -1178,7 +1136,7 @@ class ReviewPipeline:
     async def run(
         self,
         pr_url: str,
-        tool: str = "review",           # "review"|"describe"|"risks"|"improve"
+        tool: str = "review",           # "review"|"describe"|"risks"
         depth: str = "standard",         # "quick"|"standard"|"deep"
         incremental: bool = False,
         on_progress: Callable = None,
@@ -1265,7 +1223,6 @@ vscode/
 │   │   ├── reviewCommand.ts
 │   │   ├── describeCommand.ts
 │   │   ├── risksCommand.ts
-│   │   ├── improveCommand.ts
 │   │   └── publishCommand.ts
 │   └── utils/
 │       ├── urfTypes.ts        # TypeScript URF 类型定义
