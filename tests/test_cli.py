@@ -28,7 +28,6 @@ class TestMainGroup:
         assert "review" in result.output
         assert "describe" in result.output
         assert "risks" in result.output
-        assert "improve" in result.output
         assert "publish" in result.output
 
     def test_no_args_shows_help_or_error(self, runner):
@@ -108,23 +107,6 @@ class TestRisksCommand:
     def test_focus_option_accepted(self, runner):
         with patch("insightor.cli._risks", new_callable=AsyncMock):
             result = runner.invoke(main, ["risks", "https://github.com/a/b/pull/1", "--focus", "security"])
-        assert result.exit_code == 0
-
-
-# =============================================================================
-# improve
-# =============================================================================
-
-class TestImproveCommand:
-    def test_help(self, runner):
-        result = runner.invoke(main, ["improve", "--help"])
-        assert result.exit_code == 0
-        assert "improve" in result.output
-        assert "--committable-only" in result.output
-
-    def test_committable_only_flag_accepted(self, runner):
-        with patch("insightor.cli._improve", new_callable=AsyncMock):
-            result = runner.invoke(main, ["improve", "https://github.com/a/b/pull/1", "--committable-only"])
         assert result.exit_code == 0
 
 
@@ -243,11 +225,11 @@ class TestFullCommand:
 
 
 # =============================================================================
-# full-review publish — only posts improve suggestions
+# full-review publish — posts findings with feedback only
 # =============================================================================
 
 class TestFullPublish:
-    def test_full_review_publish_filters_to_improve_only(self, runner):
+    def test_full_review_publish_filters_to_feedback_only(self, runner):
         md_content = """# Insightor Full Review -- PR #1
 
 > PR: https://github.com/a/b/pull/1
@@ -270,11 +252,21 @@ class TestFullPublish:
 
 ---
 
-## 3. Code Suggestions (improve)
+## 3. Code Review (review)
 
-### Suggestions (1)
+### Findings (2)
 
-#### 1. [medium] Improve Title <!-- finding-id: 00000000-0000-0000-0000-000000000001 -->
+#### 1. [critical] Risk Title <!-- finding-id: 00000000-0000-0000-0000-000000000002 -->
+
+- **Category:** security
+- **File:** `a.py:1`
+
+- [ ] confirmed
+- [ ] false_positive
+- [ ] addressed
+- [ ] ignored
+
+#### 2. [medium] Review Title <!-- finding-id: 00000000-0000-0000-0000-000000000001 -->
 
 - **Category:** maintainability
 - **File:** `b.py:10`
@@ -297,8 +289,8 @@ class TestFullPublish:
             "findings": [
                 {
                     "id": "00000000-0000-0000-0000-000000000001",
-                    "type": "suggestion", "severity": "medium", "category": "maintainability",
-                    "title": "Improve Title", "description": "",
+                    "type": "observation", "severity": "medium", "category": "maintainability",
+                    "title": "Review Title", "description": "",
                     "location": {"path": "b.py", "range": {"start": {"line": 10}, "end": {"line": 10}}},
                     "confidence": 0.5, "fingerprint": "",
                 },
@@ -329,9 +321,9 @@ class TestFullPublish:
                 result = runner.invoke(main, ["publish", str(md_path), "--dry-run"])
                 assert result.exit_code == 0
                 assert "Full review detected" in result.output
-                # Risk finding should NOT appear (only improve)
+                # Finding WITHOUT feedback should NOT appear
                 assert "Risk Title" not in result.output
-                # Improve finding SHOULD appear
-                assert "Improve Title" in result.output
+                # Finding WITH feedback SHOULD appear
+                assert "Review Title" in result.output
             finally:
                 _os.chdir(old_cwd)
