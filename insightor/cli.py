@@ -14,10 +14,17 @@ import sys
 from pathlib import Path
 
 import click
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 from rich.console import Console
 
-load_dotenv()
+# Windows: force UTF-8 encoding to avoid Rich rendering errors with GBK locale
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
+# Search .env from CWD first (user's project root), then fall back to module location
+_dotenv_path = find_dotenv(usecwd=True) or find_dotenv()
+load_dotenv(_dotenv_path or ".env", override=True)
 
 console = Console()
 

@@ -1,0 +1,199 @@
+{
+  "name": "insightor-vscode",
+  "displayName": "Insightor",
+  "description": "AI-powered GitHub PR review in VSCode. Requires: Insightor CLI (pip install) + LLM API key. Commands: Full Review, Describe PR, Analyze Risks, Publish Review.",
+  "version": "0.1.1",
+  "publisher": "codingNow",
+  "icon": "resources/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SCU-GuGuGaGa/Insightor.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SCU-GuGuGaGa/Insightor/issues"
+  },
+  "homepage": "https://github.com/SCU-GuGuGaGa/Insightor#readme",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Linters"
+  ],
+  "keywords": [
+    "github",
+    "pull request",
+    "code review",
+    "ai",
+    "llm"
+  ],
+  "activationEvents": [
+    "*"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "insightor.reviewPR",
+        "title": "Insightor: Review PR",
+        "icon": "$(search-view-icon)"
+      },
+      {
+        "command": "insightor.describePR",
+        "title": "Insightor: Describe PR",
+        "icon": "$(file-text)"
+      },
+      {
+        "command": "insightor.risksPR",
+        "title": "Insightor: Analyze Risks",
+        "icon": "$(warning)"
+      },
+      {
+        "command": "insightor.fullReview",
+        "title": "Insightor: Full Review",
+        "icon": "$(checklist)"
+      },
+      {
+        "command": "insightor.publishReview",
+        "title": "Insightor: Publish Review",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "insightor.openSettings",
+        "title": "Insightor: Open Settings",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "insightor.refreshView",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "insightor.viewFinding",
+        "title": "View Finding Details"
+      },
+      {
+        "command": "insightor.applyFix",
+        "title": "Apply Fix",
+        "icon": "$(check)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "insightor-sidebar",
+          "title": "Insightor",
+          "icon": "resources/sidebar-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "insightor-sidebar": [
+        {
+          "id": "insightorView",
+          "name": "Review Results",
+          "icon": "resources/sidebar-icon.svg",
+          "contextualTitle": "Insightor"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "insightor.refreshView",
+          "when": "view == insightorView",
+          "group": "navigation"
+        },
+        {
+          "command": "insightor.openSettings",
+          "when": "view == insightorView",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "insightor.viewFinding",
+          "when": "view == insightorView && viewItem == finding"
+        },
+        {
+          "command": "insightor.applyFix",
+          "when": "view == insightorView && viewItem == finding",
+          "group": "inline"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "insightor.reviewPR",
+          "when": "true"
+        },
+        {
+          "command": "insightor.describePR",
+          "when": "true"
+        },
+        {
+          "command": "insightor.risksPR",
+          "when": "true"
+        },
+        {
+          "command": "insightor.fullReview",
+          "when": "true"
+        },
+        {
+          "command": "insightor.publishReview",
+          "when": "true"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Insightor",
+      "properties": {
+        "insightor.pythonPath": {
+          "type": "string",
+          "default": "python",
+          "description": "Path to Python executable (must have insightor installed)"
+        },
+        "insightor.defaultDepth": {
+          "type": "string",
+          "enum": ["quick", "standard", "deep"],
+          "default": "standard",
+          "description": "Default analysis depth"
+        },
+        "insightor.autoOpenResults": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically open results in editor after analysis"
+        },
+        "insightor.showNotifications": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show notification messages"
+        },
+        "insightor.model": {
+          "type": "string",
+          "default": "",
+          "description": "Override default LLM model (leave empty to use config default)"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.x",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.x",
+    "@typescript-eslint/parser": "^6.x",
+    "@vscode/test-electron": "^2.3.x",
+    "eslint": "^8.x",
+    "typescript": "^5.3.x",
+    "@vscode/vsce": "^2.22.x"
+  },
+  "dependencies": {}
+}

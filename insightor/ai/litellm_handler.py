@@ -21,11 +21,13 @@ import os
 import time
 from typing import AsyncIterator
 
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
 from insightor.ai.types import AIResponse, TokenUsage
 
-load_dotenv(override=True)
+# Search .env from CWD first (user's project root), then fall back to module location
+_dotenv_path = find_dotenv(usecwd=True) or find_dotenv()
+load_dotenv(_dotenv_path or ".env", override=True)
 logger = logging.getLogger(__name__)
 
 # 模型前缀路由 (无前缀 → 自动补供应商前缀)
