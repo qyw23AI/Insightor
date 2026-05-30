@@ -14,6 +14,20 @@ _SEVERITY_ICON = {
 }
 
 
+def _safe_fence(text):
+    """Return a code-fence string that won't conflict with backticks in text."""
+    max_run = 0
+    cur = 0
+    for ch in text:
+        if ch == '`':
+            cur += 1
+            if cur > max_run:
+                max_run = cur
+        else:
+            cur = 0
+    return '`' * max(3, max_run + 1)
+
+
 class MarkdownFileOutput:
     """将 ReviewResult 输出为可读 Markdown 报告。"""
 
@@ -95,14 +109,16 @@ class MarkdownFileOutput:
                 if f.suggestion:
                     if f.suggestion.current_code:
                         lines.append(f"- **当前代码**:")
-                        lines.append(f"  ```")
+                        fence = _safe_fence(f.suggestion.current_code)
+                        lines.append(f"  {fence}")
                         lines.append(f"  {f.suggestion.current_code}")
-                        lines.append(f"  ```")
+                        lines.append(f"  {fence}")
                     if f.suggestion.suggested_code:
                         lines.append(f"- **建议代码**:")
-                        lines.append(f"  ```")
+                        fence = _safe_fence(f.suggestion.suggested_code)
+                        lines.append(f"  {fence}")
                         lines.append(f"  {f.suggestion.suggested_code}")
-                        lines.append(f"  ```")
+                        lines.append(f"  {fence}")
                 if f.confidence:
                     lines.append(f"- **置信度**: {f.confidence:.0%}")
                 # Feedback checkboxes for human-in-the-loop
