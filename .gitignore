@@ -16,3 +16,14 @@ __pycache__/
 *pr-agent/
 *reviewdog/
 *aider/
+
+# Web — frontend build artifacts
+web/frontend/node_modules/
+web/frontend/dist/
+
+# Web — Python cache
+web/backend/__pycache__/
+web/backend/routes/__pycache__/
+
+# Fernet key (auto-generated, keep local)
+.insightor/.fernet_key
