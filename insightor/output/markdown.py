@@ -72,7 +72,7 @@ class MarkdownFileOutput:
         if mr:
             score_icon = "✅" if mr.score >= 80 else "⚠️" if mr.score >= 50 else "🔴"
             lines.append(f"")
-            lines.append(f"## 合并就绪评估")
+            lines.append(f"## 合并风险评估")
             lines.append(f"")
             lines.append(f"- **评分**: {score_icon} {mr.score:.0f}/100 — {mr.recommendation.value}")
             if mr.blocking_issues:
