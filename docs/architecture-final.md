@@ -704,7 +704,7 @@ class PromptBuilder:
     # vars 当前使用: title, description, branch, base_branch, author,
     #   additions, deletions, files_changed, diff, commit_messages,
     #   file_list, custom_rules, focus_categories
-    # ★ 计划中（PR #14-16 注入）: conventions, safe_patterns, context_chunks
+    # ★ 计划中（PR #15-17 注入）: conventions, safe_patterns, context_chunks
 
 class ResponseParser:
     @staticmethod
@@ -712,7 +712,7 @@ class ResponseParser:
     @staticmethod
     def from_dict(data: dict, meta: ReviewMeta) -> ReviewResult: ...
 
-# ★ v3 新增（计划中，Web UI PR #17 前实现）
+# ★ v3 新增（计划中，PR #14 Web 前后端时实现）
 class StreamParser:
     """流式增量解析器：边接收 token 边 yield Finding（计划中，待 Web UI 时实现）"""
     def __init__(self, meta: ReviewMeta)
@@ -754,11 +754,11 @@ class ReviewPipeline:
         self, pr_url: str, tool: str = "review", depth: str = "standard",
         incremental: bool = False,
         on_progress: Callable[[str], None] | None = None,
-        # ★ PR #14-16 新增（可选，有默认值）:
+        # ★ PR #15-17 新增（可选，有默认值）:
         # context_layers: list[str] | None = None,
     ) -> ReviewResult: ...
 
-    async def run_streaming(  # ★ 计划中（Web UI PR #17 前实现）
+    async def run_streaming(  # ★ 计划中（PR #14 Web 前后端时实现）
         self, pr_url: str, tool: str, depth: str,
     ) -> AsyncIterator[StreamEvent]: ...
 ```
@@ -1121,7 +1121,7 @@ insightor/
 **标题**：实现 Insightor VSCode 扩展——IDE 内一键审查、结果可视化、人机协同
 
 **功能描述**：
-将 Insightor 核心能力封装为 VSCode 扩展（TypeScript），在 IDE 内提供完整的 PR 审查工作流。插件通过调用 `insightor` CLI（子进程）或直接 import Python API 与核心通信。**同时**为后续 PR #14-16（分层上下文管线）预留扩展点，确保 Context Pipeline 完成后可直接合并到本分支。
+将 Insightor 核心能力封装为 VSCode 扩展（TypeScript），在 IDE 内提供完整的 PR 审查工作流。插件通过调用 `insightor` CLI（子进程）或直接 import Python API 与核心通信。**同时**为后续 PR #15-17（分层上下文管线）预留扩展点，确保 Context Pipeline 完成后可直接合并到本分支。
 
 **架构设计**：
 
@@ -1150,7 +1150,7 @@ VSCode Extension (TypeScript)              Insightor Core (Python)
 └─────────────────────────┘
 ```
 
-**稳定核心 API 契约（PR #14-16 必须保持兼容）**：
+**稳定核心 API 契约（PR #15-17 必须保持兼容）**：
 
 ```python
 # ===== 契约 1: CLI 接口（不变）=====
@@ -1169,14 +1169,14 @@ class ReviewPipeline:
         depth: str = "standard",         # "quick"|"standard"|"deep"
         incremental: bool = False,
         on_progress: Callable = None,
-        # ★ PR #14-16 新增（可选，有默认值）:
+        # ★ PR #15-17 新增（可选，有默认值）:
         # context_layers: list[str] | None = None,
         # context_config: ContextConfig | None = None,
     ) -> ReviewResult: ...
 
 # ===== 契约 3: URF 数据格式（仅允许增量字段）=====
 # ReviewResult / Finding / ReviewMeta — 现有字段不变
-# PR #14-16 可新增: context_summary: ContextSummary | None
+# PR #15-17 可新增: context_summary: ContextSummary | None
 # 不可删除或重命名现有字段
 
 # ===== 契约 4: 文件路径约定（不变）=====
@@ -1259,35 +1259,36 @@ vscode/
 └── .vscodeignore
 ```
 
-**并行开发策略（PR #13 ↔ PR #14-16）**：
+**并行开发策略（PR #13 ↔ PR #14 ↔ PR #15-17）**：
 
 ```
                     main (feature/fetch_pr)
                          │
-                    ┌────┴────┐
-                    │         │
-              feature/    feature/
-              pr13-vscode pr14-context  ← 用户从这里开始
-                    │         │
-                    │    feature/pr15-context
-                    │         │
-                    │    feature/pr16-context
-                    │         │
-                    └────┬────┘
-                         │  PR #16 合并到 PR #13
-                         ▼
-                  feature/pr13-vscode
-                  (含完整 Context Pipeline)
-                         │
-                         ▼
-                       main
+                    ┌────┴────┬──────────┐
+                    │         │          │
+              feature/    feature/   feature/
+              pr13-vscode pr14-web   pr15-context  ← 三人并行开发
+                    │         │          │
+                    │         │     feature/pr16-context
+                    │         │          │
+                    │         │     feature/pr17-context
+                    │         │          │
+                    └────┬────┴────┬─────┘
+                         │         │  PR #17 合并到 PR #13 + PR #14
+                         ▼         ▼
+                  feature/pr13-vscode  feature/pr14-web
+                  (含完整 Ctx Pipeline) (含完整 Ctx Pipeline)
+                         │         │
+                         ▼         ▼
+                       main (最终合并)
 ```
 
 **关键原则**：
 - PR #13 只新增 `vscode/` 目录，不修改 `insightor/` 中任何文件
-- PR #14-16 修改 `insightor/` 但遵守稳定 API 契约
-- 最终 PR #16 → PR #13 合并时，两边修改的是不同文件 → 零冲突
-- 若需修改契约，先在 `docs/architecture-final.md` 更新，双方同步
+- PR #14 只新增 `web/` 目录，不修改 `insightor/` 中任何文件
+- PR #15-17 修改 `insightor/` 但遵守稳定 API 契约
+- 最终 PR #17 → PR #13 + PR #14 合并时，三方修改的是不同文件 → 零冲突
+- 若需修改契约，先在 `docs/architecture-final.md` 更新，各方同步
 
 **测试方式**：
 - VSCode 扩展单元测试（TypeScript — mocha/chai）
@@ -1297,7 +1298,200 @@ vscode/
 
 ---
 
-#### PR #14：Context Pipeline 框架 + Layer 1-2
+#### PR #14：Web 前后端 — Insightor Web 控制台
+
+**标题**：实现 Insightor Web 前后端——FastAPI 后端 + React 前端，支持流式审查、结果可视化与人机协同
+
+**功能描述**：
+将 Insightor 从 CLI 工具升级为 Web 应用。后端基于 FastAPI + SSE 提供 REST API 和流式推送，前端使用 React + Vite 构建 SPA 控制台。用户通过浏览器输入 PR URL，实时查看分析进度，在可视化界面中浏览发现结果并勾选反馈，一键发布到 GitHub。支持部署到 Ubuntu 24.04 云服务器。
+
+**架构设计**：
+
+```
+浏览器 (React SPA)                        服务器 (Ubuntu 24.04)
+══════════════════                        ═══════════════════
+┌──────────────────────┐                 ┌──────────────────────────┐
+│  PR Input Form        │                 │  FastAPI (uvicorn)       │
+│  ├── URL + Depth      │──POST /api/──▶│  ├── /api/analyze         │
+│  └── Tool Selection   │    analyze     │  │   → ReviewPipeline.run()│
+├──────────────────────┤                 │  │   → SSE progress stream │
+│  Progress Panel       │◀──SSE stream──│  ├── /api/analyze/{id}/   │
+│  ├── 步骤进度          │                │  │   stream (SSE)         │
+│  └── 耗时/token统计    │                │  ├── /api/analyze/{id}/   │
+├──────────────────────┤                 │  │   result (JSON)        │
+│  Result Tabs          │──GET /api/──▶│  ├── /api/publish          │
+│  ├── 📋 总结           │   result      │  │   → DraftParser +      │
+│  ├── ⚠️ 风险           │                │  │     GitHubCommentOutput │
+│  ├── 📝 审查 (checkbox)│──POST /api/──▶│  ├── /api/quality         │
+│  └── 🚦 合并就绪        │   publish     │  │   → QualityTracker      │
+├──────────────────────┤                 │  └── 静态文件服务 (SPA)    │
+│  Feedback Interaction │                └──────────────────────────┘
+│  ├── 勾选确认/误报/...  │
+│  ├── 填写审查者+备注    │
+│  └── 一键 Publish 按钮  │
+└──────────────────────┘
+```
+
+**实现思路**：
+
+后端（FastAPI）设计：
+- 将现有 `ReviewPipeline.run()` 包装为异步 API，通过 `asyncio.Queue` 桥接 `on_progress` 回调到 SSE 流
+- SSE 推送事件类型：`step`（步骤变更）、`finding`（流式解析的逐条发现）、`done`（完成含 ReviewResult 摘要）、`error`（异常）
+- 分析任务以 `job_id`（UUID）管理，结果缓存于 `.insightor/jobs/`，支持后续查询
+- `publish` 端点复用现有 `DraftParser` + `GitHubCommentOutput`，接收前端传来的反馈数据
+- 静态文件服务：生产模式由 FastAPI `mount` 托管 React build，开发模式 Vite proxy 到后端
+
+前端（React + Vite）设计：
+- **PRInput 组件**：URL 输入框、depth/工具选择、提交按钮，表单校验
+- **ProgressPanel 组件**：基于 SSE `step` 事件展示实时步骤进度条，显示耗时和 token 统计
+- **ResultTabs 组件**：四段式标签页（总结/风险/审查/合并就绪），从 API 获取完整 ReviewResult 渲染
+- **FindingCard 组件**：单条发现卡片，含严重度图标、类别标签、代码 diff（语法高亮）、置信度进度条
+- **FeedbackPanel 组件**：checkbox 交互区（confirmed/false_positive/addressed/ignored），审查者和备注输入框，Publish 按钮
+- **useSSE Hook**：封装 EventSource 连接管理，自动重连，解析 SSE 事件类型
+
+**涉及接口**：
+
+```python
+# ===== FastAPI 后端 =====
+# GET  /api/health              → {"status": "ok", "version": "0.1.0"}
+# POST /api/analyze             → {"job_id": "uuid", "status": "running"}
+#      body: {pr_url, tool?, depth?, model?}
+# GET  /api/analyze/{job_id}/stream  → SSE (text/event-stream)
+# GET  /api/analyze/{job_id}/result  → ReviewResult (JSON)
+# POST /api/publish             → {"published": N, "comment_url": "..."}
+#      body: {pr_url, findings: [{id, feedback: {status, reviewer_note, reviewed_by}}]}
+# GET  /api/quality             → QualityMetrics
+
+# ===== SSE 事件类型 =====
+# event: step      data: {"step": "正在获取 PR 数据...", "index": 1, "total": 7}
+# event: finding   data: {Finding}    # 流式解析的逐条发现
+# event: done      data: {meta, stats, merge_readiness}
+# event: error     data: {message, code}
+
+# ===== SSE Manager =====
+class SSEManager:
+    """管理 SSE 连接池，支持多客户端同时监听。"""
+    def __init__(self): ...
+    async def subscribe(self, job_id: str) -> asyncio.Queue: ...
+    async def publish(self, job_id: str, event: str, data: dict): ...
+    async def unsubscribe(self, job_id: str, queue): ...
+
+# ===== Job Manager =====
+class JobManager:
+    """管理分析任务的生命周期。"""
+    async def create(self, pr_url: str, tool: str, depth: str, model: str | None) -> str: ...
+    async def run(self, job_id: str, sse: SSEManager): ...  # 调用 ReviewPipeline
+    async def get_result(self, job_id: str) -> ReviewResult | None: ...
+    async def get_status(self, job_id: str) -> str: ...  # pending|running|done|error
+```
+
+```typescript
+// ===== 前端 API 客户端 =====
+// src/api/client.ts
+interface AnalyzeRequest {
+  pr_url: string; tool?: string; depth?: string; model?: string;
+}
+interface AnalyzeResponse { job_id: string; status: string; }
+
+// src/hooks/useSSE.ts
+function useSSE(jobId: string | null): {
+  progress: ProgressState;     // { step, index, total }
+  findings: Finding[];         // 流式累积
+  done: boolean;
+  error: string | null;
+  result: ReviewResult | null; // done 后可用
+}
+
+// ===== TypeScript URF 类型 =====
+// src/types/urf.ts — 与 Python URF Schema 对应
+interface ReviewResult { meta: ReviewMeta; summary: PRSummary; ... }
+interface Finding { id: string; severity: Severity; feedback?: FindingFeedback; ... }
+```
+
+**目录结构**：
+
+```
+web/
+├── frontend/                  # React + Vite SPA
+│   ├── package.json
+│   ├── vite.config.ts
+│   ├── tsconfig.json
+│   ├── index.html
+│   └── src/
+│       ├── main.tsx           # React 入口
+│       ├── App.tsx            # 路由 + 布局
+│       ├── api/
+│       │   └── client.ts      # API 调用封装
+│       ├── hooks/
+│       │   └── useSSE.ts      # SSE Hook
+│       ├── components/
+│       │   ├── PRInput.tsx    # 输入表单
+│       │   ├── ProgressPanel.tsx  # 进度展示
+│       │   ├── ResultTabs.tsx     # 结果标签页
+│       │   ├── FindingCard.tsx    # 发现卡片
+│       │   ├── FeedbackPanel.tsx  # 反馈交互
+│       │   └── CodeBlock.tsx      # 代码高亮
+│       ├── types/
+│       │   └── urf.ts         # URF TypeScript 定义
+│       └── styles/
+│           └── index.css
+├── backend/
+│   ├── __init__.py
+│   ├── app.py                 # FastAPI 应用入口
+│   ├── routes/
+│   │   ├── __init__.py
+│   │   ├── analyze.py         # 分析 API 路由
+│   │   ├── publish.py         # 发布 API 路由
+│   │   └── quality.py         # 质量指标 API 路由
+│   ├── sse_manager.py         # SSE 连接管理
+│   ├── job_manager.py         # 任务生命周期管理
+│   └── static/                # React build 输出 (生产模式, .gitignore)
+├── requirements-web.txt       # Web 前端 Node 依赖说明
+└── README.md                  # 部署说明
+```
+
+**开发工作流**：
+
+```
+# 阶段 1 — 本机前端开发（不依赖后端）
+cd web/frontend
+npm install
+npm run dev                   # Vite dev server → http://localhost:5173
+# 使用 MSW 或硬编码 mock 数据独立开发 UI
+
+# 阶段 2 — 前后端打通
+cd web/backend
+pip install -e ".[web]"
+uvicorn insightor.web.backend.app:app --reload --port 8000
+# Vite proxy 配置将 /api/* 转发到 localhost:8000
+
+# 阶段 3 — 云服务器部署
+# 前端 build: npm run build → web/frontend/dist/
+# 后端以生产模式启动: uvicorn insightor.web.backend.app:app --host 0.0.0.0 --port 80
+```
+
+**对 PR #13 契约的影响**：零影响。仅新增 `web/` 目录，不修改 `insightor/` 或 `vscode/`。
+
+**部署目标**：
+
+| 项目 | 规格 |
+|------|------|
+| 操作系统 | Ubuntu 24.04 LTS |
+| Python | 3.12（系统自带） |
+| Node.js | 20.x LTS（仅 build 时需要） |
+| 进程管理 | systemd（`insightor-web.service`） |
+| 反向代理 | 可选 nginx（生产环境建议） |
+| 最小配置 | 1 vCPU / 1GB RAM / 20GB 磁盘 |
+
+**测试方式**：
+- 后端：FastAPI TestClient 集成测试（analyze 创建任务 + SSE 流 + result 查询 + publish 端点）
+- 前端：React Testing Library 组件测试 + MSW mock API
+- 端到端：Vite dev server → localhost FastAPI，提交 PR URL，验证四段式结果展示和 feedback 交互
+- 部署验证：`ssh ubuntu-server` → `systemctl status insightor-web` → 浏览器访问 `http://<ip>`
+
+---
+
+#### PR #15：Context Pipeline 框架 + Layer 1-2（原 PR #14）
 
 **标题**：实现分层上下文管线框架——Diff 上下文与文件上下文扩展
 
@@ -1364,7 +1558,7 @@ insightor/processing/
 
 ---
 
-#### PR #15：Layer 3-4 — Issue 关联 + 关联文件发现 (Aider PageRank)
+#### PR #16：Layer 3-4 — Issue 关联 + 关联文件发现 (Aider PageRank)（原 PR #15）
 
 **标题**：实现 Issue 上下文与 Aider 启发式关联文件发现
 
@@ -1431,12 +1625,16 @@ class RelatedFileSource:
 
 ---
 
-#### PR #16：Layer 5 + Context Pipeline 集成
+### Day 5 — 产品化与文档
+
+---
+
+#### PR #17：Layer 5 + Context Pipeline 集成（原 PR #16）
 
 **标题**：实现仓库结构分析层，并将分层上下文管线完整接入 Review Pipeline
 
 **功能描述**：
-Layer 5 对全仓库进行 AST 分析，生成仓库地图。将 PR #14-15 的 Context Pipeline 集成到 ReviewPipeline.run() 中。按 AnalysisDepth 控制启用层（quick: L1/L2, standard: L1-L4, deep: L1-L5）。context_summary 填充到 ReviewResult。Token 预算自动分配。**本 PR 最终合并到 PR #13（VSCode 插件）分支**，使 VSCode 插件获得完整 Context Pipeline 能力。
+Layer 5 对全仓库进行 AST 分析，生成仓库地图。将 PR #15-16 的 Context Pipeline 集成到 ReviewPipeline.run() 中。按 AnalysisDepth 控制启用层（quick: L1/L2, standard: L1-L4, deep: L1-L5）。context_summary 填充到 ReviewResult。Token 预算自动分配。**本 PR 最终合并到 PR #13（VSCode 插件）和 PR #14（Web 前后端）分支**，使 IDE 插件和 Web 控制台均获得完整 Context Pipeline 能力。
 
 **涉及接口**：
 
@@ -1474,31 +1672,17 @@ standard    ✅  ✅  ✅  ✅
 deep        ✅  ✅  ✅  ✅  ✅
 ```
 
-**合并到 PR #13 的保证**：
+**合并到 PR #13 / PR #14 的保证**：
 - `ReviewPipeline.run()` 新增参数均有默认值 → 现有调用无需修改
 - `ReviewResult` 新增 `context_summary` 字段为可选 → 反序列化兼容
-- 所有新增文件在 `insightor/processing/context/` 下 → 不与 `vscode/` 冲突
+- 所有新增文件在 `insightor/processing/context/` 下 → 不与 `vscode/` 和 `web/` 冲突
 
 **测试方式**：
 - quick/standard/deep 三层上下文正确启用
 - context_summary 字段完整填充
 - Token 预算不超限
 - 端到端：`insightor full <PR_URL> --depth deep` 验证多层上下文效果
-- 合并验证：PR #16 合并到 PR #13 后，VSCode 插件仍正常运行
-
----
-
-### Day 5 — 产品化与文档
-
----
-
-#### PR #17：Web UI（可选增强）
-
-**标题**：实现基于 FastAPI + SSE 的 Web 界面，支持流式实时展示
-
-**关键新增（vs V2）**：
-- SSE 流式推送分析进度和增量结果
-- 结果页面带实时更新的 Tab（总结 / 风险 / 建议 / 合并就绪）
+- 合并验证：PR #17 合并到 PR #13 / PR #14 后，VSCode 插件和 Web 控制台仍正常运行
 
 ---
 
@@ -1533,7 +1717,7 @@ PR #1 (工程 + 配置 + URF v3)  ← 基础，所有 PR 依赖
     │     ┌───────────┼───────────┐
     │     │           │           │
     │  PR #7      PR #8       PR #9
-    │ (总结)     (风险+MR)   (建议)
+    │ (总结)     (风险+MR)   (建议→合并到review)
     │     │           │           │
     │     └───────────┼───────────┘
     │                 │
@@ -1543,27 +1727,30 @@ PR #1 (工程 + 配置 + URF v3)  ← 基础，所有 PR 依赖
     │                 │
     │           PR #12 (CLI + full 命令)
     │                 │
-    │     ┌───────────┴───────────┐
+    │     ┌───────────┼───────────┐
     │     │  ★ 并行开发（不同文件）  │
     │     │                       │
-    │  PR #13 (VSCode 插件)    PR #14 (Ctx L1-2)
-    │  只新增 vscode/         新增 processing/context/
+    │  PR #13 (VSCode 插件)    PR #14 (Web 前后端)
+    │  只新增 vscode/         只新增 web/
     │     │                       │
-    │     │                  PR #15 (Ctx L3-4)
-    │     │                  新增 tree-sitter 等
-    │     │                       │
-    │     │                  PR #16 (Ctx L5 + 集成)
-    │     │                  修改 pipeline.py
-    │     │                       │
-    │     └───────────┬───────────┘
-    │                 │  PR #16 合并到 PR #13
-    │                 ▼
-    │           PR #13 + PR #16
-    │           (VSCode 插件 + 完整 Ctx Pipeline)
-    │                 │
-    │           PR #17 (Web UI, 可选)
-    │                 │
-    │           PR #18 (文档 + 集成测试)
+    │     │     ┌─────────────────┘
+    │     │     │
+    │     │  PR #15 (Ctx L1-2) ← 原 PR #14
+    │     │  新增 processing/context/
+    │     │     │
+    │     │  PR #16 (Ctx L3-4) ← 原 PR #15
+    │     │  新增 tree-sitter 等
+    │     │     │
+    │     │  PR #17 (Ctx L5 + 集成) ← 原 PR #16
+    │     │  修改 pipeline.py
+    │     │     │
+    │     └──┬──┘
+    │        │  PR #17 同时合并到 PR #13 和 PR #14
+    │        ▼
+    │  PR #13 + PR #14 + PR #17
+    │  (VSCode + Web + 完整 Ctx Pipeline)
+    │        │
+    │  PR #18 (文档 + 集成测试)
     │
     └── PR #4 (AI 客户端 + 流式)
           │
@@ -1573,8 +1760,10 @@ PR #1 (工程 + 配置 + URF v3)  ← 基础，所有 PR 依赖
 **并行开发说明**：
 
 - **PR #13（VSCode 插件）** 只新增 `vscode/` 目录，不修改 `insightor/`
-- **PR #14-16（Context Pipeline）** 新增 `insightor/processing/context/`，修改 `pipeline.py`（向后兼容）
-- 两分支修改的文件互不重叠 → 最终 PR #16 可直接合并到 PR #13 分支
+- **PR #14（Web 前后端）** 只新增 `web/` 目录，不修改 `insightor/`
+- **PR #13 与 PR #14 可完全并行开发**（不同目录，零冲突）
+- **PR #15-17（Context Pipeline）** 新增 `insightor/processing/context/`，修改 `pipeline.py`（向后兼容）
+- PR #17 最终同时合并到 PR #13 和 PR #14 分支，使两个前端均获得完整 Context Pipeline
 - 稳定 API 契约：CLI 参数不变、ReviewResult 字段只增不删、ReviewPipeline.run() 新参数有默认值
 
 ---
@@ -1593,8 +1782,10 @@ PR #1 (工程 + 配置 + URF v3)  ← 基础，所有 PR 依赖
 
 | 天数 | PR | 内容 | 预估耗时 |
 |------|-----|------|---------|
-| **Day 1** | #1, #2, #3, #4 | 基础层：工程+URF+Provider+Diff处理+AI | 7-9h |
-| **Day 2** | #5, #6, #7, #8 | 核心引擎：Prompt+Parser+管线+总结+风险+MR | 7-9h |
-| **Day 3** | #9, #10, #11, #12 | 特性完善：建议+Output+人机协同+CLI | 7-9h |
-| **Day 4** | #13 + #14-16 (并行) | VSCode 插件 ∥ Context Pipeline (并行开发) | 10-14h (2人) |
-| **Day 5** | #17(可选), #18 | 产品化：Web+文档+集成测试 | 4-6h |
+| **Day 1** | #1, #2, #3, #4 | ✅ 基础层：工程+URF+Provider+Diff处理+AI | 已完成 |
+| **Day 2** | #5, #6, #7, #8 | ✅ 核心引擎：Prompt+Parser+管线+总结+风险+MR | 已完成 |
+| **Day 3** | #9, #10, #11, #12 | ✅ 特性完善：Output+人机协同+CLI | 已完成 |
+| **Day 4** | #13 + #14 (并行) | VSCode 插件 (#13-协作者) ∥ Web 前后端 (#14-用户) | 10-14h (2人并行) |
+| **Day 5** | #15, #16 | Context Pipeline L1-4 (分步提交) | 7-9h |
+| **Day 6** | #17 | Context Pipeline L5 + 集成到 VSCode & Web | 5-7h |
+| **Day 7** | #18 | 文档 + 集成测试 + 部署验证 | 4-6h |
