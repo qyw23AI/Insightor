@@ -16,7 +16,7 @@
 │  │ · BuildInfo: 自动检测 CI 环境                                      │   │
 │  │ · ConfigLoader: default → .insightor.yml → env → CLI (四级覆盖)    │   │
 │  │ · AnalysisDepth: quick | standard | deep                          │   │
-│  │ · IncrementalDetector: 检测是否为新 push，加载上次 ReviewResult      │   │
+│  │ · IncrementalDetector: (由 CacheManager.get_base_for_incremental 实现) │   │
 │  └──────────────────────────────────────────────────────────────────┘   │
 └────────────────────────────┬─────────────────────────────────────────────┘
                              │
@@ -430,12 +430,15 @@ FeedbackCollector 收集反馈
 # ===== 配置层 =====
 class ConfigLoader:
     def __init__(self, config_path: str = None)
-    def load(self) -> dict
+    def get(self, key_path: str, default: Any = None) -> Any
+    def get_section(self, section: str) -> dict[str, Any]
     def load_project_config(self, repo_root: str) -> dict | None
-    def get_rules(self) -> list[str]        # custom_rules
-    def get_conventions(self) -> list[str]  # coding conventions
+    def apply_cli_args(self, **kwargs: Any) -> None
+    def get_rules(self) -> list[str]           # custom_rules
+    def get_conventions(self) -> list[str]     # coding conventions
     def get_safe_patterns(self) -> list[str]
     def get_dependency_map(self) -> dict[str, list[str]]
+    def get_focus_categories(self) -> list[str]
 
 # ===== URF Schema (Pydantic v3) =====
 class ReviewMeta(BaseModel):
@@ -550,7 +553,7 @@ class GitProvider(Protocol):
     def get_files(self, pr_url: str) -> list[FilePatchInfo]: ...
     def get_commits(self, pr_url: str) -> list[CommitInfo]: ...
     def get_repo_settings(self, pr_url: str) -> str | None: ...
-    def get_issue_context(self, issue_refs: list[str]) -> list[IssueInfo]: ...  # ★ Layer 3 用
+    def get_issue_context(self, pr_url: str, issue_refs: list[str]) -> list[IssueInfo]: ...  # ★ Layer 3 用
 
 class DiffService(Protocol):
     def get_diff(self, ctx) -> bytes: ...
@@ -584,9 +587,9 @@ class FileFilter:
 
 class LanguageDetector:
     """自动语言检测与主语言优先排序"""
-    def detect(self, file: FilePatchInfo) -> str: ...
+    def detect(self, filename: str) -> str: ...
     def group_by_language(self, files) -> dict[str, list]: ...
-    def sort_by_priority(self, files, main_language) -> list: ...
+    def sort_by_priority(self, files, main_language="") -> list: ...
     # 支持 Python/JS/TS/Go/Java/Rust 等
 
 class TokenEstimator:
@@ -597,16 +600,17 @@ class TokenEstimator:
 
 class DiffCompressor:
     """渐进压缩——Level 0→3 逐步减少 token"""
-    def __init__(self, max_tokens: int): ...
-    def compress(self, files, depth) -> CompressedDiff: ...
+    def __init__(self, max_tokens: int = 8000, patch_extra_lines: int = 3): ...
+    def compress(self, files, depth) -> CompressResult: ...
     # Level 0: 完整 diff → Level 1: 删减 hunk → Level 2: 截断文件 → Level 3: 仅签名
 
 class CacheManager:
     """PR 结果缓存——(PR_URL + SHA) 索引，支持增量审查"""
     def get(self, pr_url, sha) -> ReviewResult | None: ...
-    def put(self, pr_url, sha, result) -> None: ...
+    def put(self, pr_url, sha, result) -> Path: ...
     def get_latest(self, pr_url) -> ReviewResult | None: ...
     def get_base_for_incremental(self, pr_url, current_sha) -> tuple[str, ReviewResult] | None: ...
+    def list_reviews(self, pr_url) -> list[dict]: ...
 ```
 
 **实际实现文件**：
@@ -670,16 +674,22 @@ Jinja2 Prompt 模板（TOML 存储），支持从 `.insightor.yml` 注入 custom
 
 ```python
 class PromptBuilder:
-    def build(self, tool: str, vars: dict) -> tuple[str, str]
-    # vars 新增: custom_rules, conventions, safe_patterns, context_chunks
+    def __init__(self, template_dir: str | None = None): ...
+    def build(self, tool: str, vars: dict | None = None) -> tuple[str, str]
+    # vars 当前使用: title, description, branch, base_branch, author,
+    #   additions, deletions, files_changed, diff, commit_messages,
+    #   file_list, custom_rules, focus_categories
+    # ★ 计划中（PR #14-16 注入）: conventions, safe_patterns, context_chunks
 
-class ResponseParser(Protocol):
-    def parse(self, raw: str, meta: ReviewMeta) -> ReviewResult: ...
-    def can_parse(self, raw: str) -> bool: ...
+class ResponseParser:
+    @staticmethod
+    def parse(raw: str, meta: ReviewMeta) -> ReviewResult: ...
+    @staticmethod
+    def from_dict(data: dict, meta: ReviewMeta) -> ReviewResult: ...
 
-# ★ v3 新增
+# ★ v3 新增（计划中，Web UI PR #17 前实现）
 class StreamParser:
-    """流式增量解析器：边接收 token 边 yield Finding"""
+    """流式增量解析器：边接收 token 边 yield Finding（计划中，待 Web UI 时实现）"""
     def __init__(self, meta: ReviewMeta)
     def feed(self, chunk: str) -> list[Finding]: ...  # 返回新解析出的 findings
     def flush(self) -> list[Finding]: ...             # 流结束后处理剩余 buffer
@@ -712,14 +722,20 @@ class StreamParser:
 
 ```python
 class ReviewPipeline:
+    def __init__(self, model: str | None = None,
+                 fallback_models: list[str] | None = None,
+                 cache_dir: str | None = None): ...
     async def run(
-        self, pr_url: str, tool: str, depth: AnalysisDepth,
-        incremental: bool = False, stream: bool = False,
+        self, pr_url: str, tool: str = "review", depth: str = "standard",
+        incremental: bool = False,
+        on_progress: Callable[[str], None] | None = None,
+        # ★ PR #14-16 新增（可选，有默认值）:
+        # context_layers: list[str] | None = None,
     ) -> ReviewResult: ...
 
-    async def run_streaming(
-        self, pr_url: str, tool: str, depth: AnalysisDepth,
-    ) -> AsyncIterator[StreamEvent]: ...  # ★ v3 新增：流式模式
+    async def run_streaming(  # ★ 计划中（Web UI PR #17 前实现）
+        self, pr_url: str, tool: str, depth: str,
+    ) -> AsyncIterator[StreamEvent]: ...
 ```
 
 ---
@@ -927,29 +943,74 @@ class FingerprintGenerator:
 
 ---
 
-#### PR #11：人机协同审查 + 反馈闭环（计划中）
+#### PR #11：人机协同审查 + 反馈闭环
 
 **标题**：实现人机协同审查工作流——草稿解析、人工确认、反馈收集与质量追踪
 
 **功能描述**：
-在 PR #10 输出层基础上加入人类确认环节。AI 生成 Markdown 审查草稿（含 checkbox 状态标记），人类程序员编辑确认后通过 publish 脚本发布到 GitHub。FeedbackCollector 从 GitHub Reaction 回读反馈信号，QualityTracker 统计每 category 历史准确率。
+在 PR #10 输出层基础上加入人类确认环节。AI 生成 Markdown 审查草稿（含 finding-id HTML 注释和 checkbox 状态标记），人类程序员编辑确认后通过 publish 脚本一键发布到 GitHub（PR URL 自动从 Markdown 检测）。GitHub 评论格式与 Markdown 保持一致，含完整发现详情。QualityTracker 统计每 category 历史准确率，持久化到 `.insightor/quality/`。
+
+**工作流程**：
+
+```
+python scripts/review.py <PR_URL>        # AI 生成审查 → Markdown（含 checkbox + PR URL）
+  → 人类编辑 .md 文件，勾选反馈状态
+  → python scripts/publish.py draft.md   # 一键发布到 GitHub（PR URL 自动检测）
+```
 
 **涉及接口**：
 
 ```python
+# ==== DraftParser ====
 class DraftParser:
-    """解析人类编辑后的 Markdown 草稿 → 更新 ReviewResult 的 finding.feedback"""
-    def parse(md_path) -> tuple[ReviewResult, int]: ...
+    """解析人类编辑后的 Markdown 草稿 → 更新 ReviewResult 的 finding.feedback。
+    通过 HTML 注释 <!-- finding-id: UUID --> 匹配 finding，扫描 checkbox 状态。"""
+    @staticmethod
+    def parse(md_path: str, original_result: ReviewResult) -> tuple[ReviewResult, int]: ...
+    @staticmethod
+    def _extract_feedback_map(md_text: str) -> dict[UUID, FindingFeedback]: ...
 
-class FeedbackCollector:
-    async def collect(self, result: ReviewResult) -> ReviewResult: ...
-    async def read_comment_reactions(self, comment_url: str) -> dict[str, str]: ...
-
+# ==== QualityTracker ====
 class QualityTracker:
+    """按 category 追踪历史精确度，持久化到 .insightor/quality/。
+    history.json 记录累积反馈计数（total/confirmed/false_positive/addressed/ignored），
+    metrics.json 存储预计算的 QualityMetrics。"""
+    def __init__(self, storage_dir: str = ".insightor/quality"): ...
     def track(self, result: ReviewResult) -> None: ...
     def get_precision(self, category: str) -> float: ...
     def export_metrics(self) -> QualityMetrics: ...
+
+# ==== FeedbackCollector (stub) ====
+class FeedbackCollector:
+    """预留 GitHub Reactions 反馈收集接口，等 PR 评论发布流程稳定后实现。"""
+    async def collect(self, result: ReviewResult) -> ReviewResult: ...    # no-op
+    async def read_comment_reactions(self, comment_url: str) -> dict: ... # NotImplementedError
 ```
+
+**关键新增**：
+- `insightor/feedback/` 包：DraftParser、QualityTracker、FeedbackCollector
+- DraftParser：正则匹配 HTML 注释中的 finding-id，扫描 checkbox 状态（第一个 `[x]` 生效），提取审查者和备注
+- `MarkdownFileOutput` 增强：每个 finding 标题嵌入 `<!-- finding-id: UUID -->`，追加 feedback checkbox 区域（confirmed/false_positive/addressed/ignored），footer 嵌入 `<!-- insightor-pr-url: URL -->` 供 publish 脚本自动检测
+- `GitHubCommentOutput` 重构：`_build_comment()` 输出与 Markdown 完全一致的结构（总结 + 合并就绪 + 变更文件表 + 完整发现详情含代码建议），不再只是简化表格
+- `scripts/publish.py`：从 markdown 自动检测 PR URL，支持 `--dry-run`（仅预览变更）和 `--json`（指定 companion JSON），流程：加载原始 JSON → DraftParser 解析反馈 → GitHub 发布 → JSON 保存 → QualityTracker 追踪
+- 人类编辑流程：Markdown 中 checkbox 格式 `- [x] confirmed`、`- [ ] false_positive` 等，审查者通过 `**审查者:**` 字段填写，备注通过 `**备注:**` 字段填写
+
+**实际实现文件**：
+```
+insightor/feedback/
+├── __init__.py          # 导出 DraftParser / QualityTracker / FeedbackCollector
+├── draft_parser.py       # DraftParser
+├── quality_tracker.py    # QualityTracker
+└── collector.py          # FeedbackCollector (stub)
+scripts/
+└── publish.py            # CLI 发布脚本
+```
+
+**测试方式**：
+- 17 个反馈层单元测试（TestDraftParser 7 + TestQualityTracker 8 + TestFeedbackCollector 2）
+- 2 个 Markdown 输出测试（finding-id HTML 注释存在、checkbox 和 footer 存在）
+- DraftParser 测试覆盖：无反馈、确认反馈、多发现、无 checkbox、未知 ID、空发现、只有备注无 checkbox
+- QualityTracker 测试覆盖：confirmed、混合反馈、无数据、多类别、导出指标、持久化、跳过无反馈、累积追踪
 
 ---
 
@@ -958,19 +1019,23 @@ class QualityTracker:
 **标题**：实现命令行交互界面，完成全系统端到端集成
 
 **功能描述**：
-`insightor` CLI 命令，支持 review/describe/risks/improve 四个子命令。集成流式进度展示（Rich Live）、增量模式（自动检测缓存）、分析深度选择。
+基于 click 实现统一的 `insightor` CLI 命令，支持 full/review/describe/risks/improve/publish 六个子命令。`full` 命令一次串联全部四个分析工具，生成四段式组合 Markdown（describe/risks/improve/review），各段内容不重复，仅 improve 段含 feedback checkbox。publish 自动检测 full 报告并只发布 improve 建议。集成 Rich `Console().status()` 实时进度展示，`--debug` 模式打印完整中间数据。`pyproject.toml` 已注册 `insightor = "insightor.cli:main"` 入口点。
 
 **CLI 命令一览**：
 
 ```bash
+# 一键全部分析（推荐）
+insightor full <url> --depth deep
+insightor full <url> --skip review --skip risks       # 跳过指定工具
+
 # 完整审查
 insightor review https://github.com/owner/repo/pull/123
 
 # 快速/深度模式
-insightor review <url> --depth quick   # ~15s
-insightor review <url> --depth deep    # ~60s，含自反思 + 完整上下文
+insightor review <url> --depth quick
+insightor review <url> --depth deep
 
-# 增量审查（自动检测上次缓存）
+# 增量审查
 insightor review <url> --incremental
 
 # 子命令
@@ -978,27 +1043,280 @@ insightor describe <url>               # PR 总结
 insightor risks <url> --focus security # 风险分析
 insightor improve <url> --committable-only  # 代码建议
 
-# 输出控制
-insightor review <url> --output all --output-dir ./reviews
-insightor review <url> --model claude-sonnet-4-6
-insightor review <url> --config .insightor.yml
-
-# 反馈标记
-insightor feedback <url> --finding-id abc123 --status false_positive
+# 发布已确认审查（full 报告自动只发布 improve）
+insightor publish <md_path> --dry-run
 ```
 
+**`insightor full` 工作流程**：
+
+```
+insightor full <url>
+  ├── describe  → PR 总结 + 变更文件表
+  ├── risks     → 安全/性能/并发风险发现
+  ├── review    → 代码审查发现
+  └── improve   → 代码改进建议（含 feedback checkbox）
+       ↓
+  FingerprintGenerator 跨工具去重
+       ↓
+  合并 Markdown: insightor-full-review-{pr}.md
+  ├── ## 1. PR 总结 (describe)          — 无 checkbox
+  ├── ## 2. 风险分析 (risks)            — 无 checkbox
+  ├── ## 3. 代码审查 (review)           — 无 checkbox
+  ├── ## 4. 代码建议 (improve)          — 有 checkbox ← 唯一可发布段
+  └── ## 反馈说明                        — 仅指向第4节
+       ↓
+  人类编辑第3节 checkbox → insightor publish
+       ↓
+  GitHub 评论只含 improve 建议
+```
+
+**涉及接口**：
+
+```python
+# ==== CLI 入口 (click group) ====
+@click.group()
+def main(): ...
+
+# ==== 子命令 ====
+@main.command(); def full(pr_url, depth, skip, debug): ...       # ★ 新增
+@main.command(); def review(pr_url, depth, incremental, model, debug): ...
+@main.command(); def describe(pr_url, depth, debug): ...
+@main.command(); def risks(pr_url, depth, focus, debug): ...
+@main.command(); def improve(pr_url, depth, committable_only, debug): ...
+@main.command(); def publish(md_path, dry_run, json_path): ...
+
+# ==== 异步实现 ====
+async def _full(pr_url, depth, skip, debug): ...
+async def _review(pr_url, depth, incremental, model, debug): ...
+async def _describe(pr_url, depth, debug): ...
+async def _risks(pr_url, depth, focus, debug): ...
+async def _improve(pr_url, depth, committable_only, debug): ...
+async def _publish(md_path, dry_run, json_path): ...
+
+# ==== Full 辅助 ====
+def _build_full_markdown(merged, results, pr_url, pr_num): ...   # 组装四段式 Markdown
+def _extract_pr_num_from_url(pr_url): ...
+
+# ==== Debug 辅助 ====
+async def _debug_review(pr_url, depth): ...
+async def _debug_tool(pr_url, tool, depth): ...
+```
+
+**关键新增**：
+- `insightor full`：依次运行 describe → risks → improve → review，`FingerprintGenerator.deduplicate()` 跨工具去重，生成 `insightor-full-review-{pr}.md`（四段式结构，含 `<!-- insightor-full-review -->` 标记）
+- 四段式 Markdown：各段内容独立不重复，仅第4节（improve）含 feedback checkbox 和 `<!-- finding-id: UUID -->` 注释，前3节（describe/risks/review）不含 checkbox，反馈说明只指向第4节
+- publish 增强：检测 `<!-- insightor-full-review -->` 标记 → 自动过滤只保留 `type == FindingType.SUGGESTION` 的 finding → GitHub 评论只含 improve 建议
+- `--skip` 选项：可跳过指定工具，如 `--skip review --skip risks`
+- `_load_original_result` 兼容 `insightor-full-review-{pr}.md` 文件名模式
+- 现有 `scripts/*.py` 保持不变，向后兼容
+
+**实际实现文件**：
+```
+insightor/
+└── cli.py               # CLI 入口（6 个子命令 + 2 个 debug 辅助 + markdown 生成）
+```
+
+**测试方式**：
+- 25 个 CLI 单元测试（click.testing.CliRunner）：full 帮助/参数/--skip/--debug、full-publish 过滤 improve-only 集成测试、以及原有 review/describe/risks/improve/publish 测试
+- full-publish 集成测试：构造四段式 Markdown + 含 risk+suggestion 的 JSON，验证 publish 后只输出 improve 建议、风险发现被过滤
+- 手动验证：`python -m insightor.cli --help` 显示 full 子命令
+
 ---
 
-### Day 4 — 分层上下文管线 (Context Pipeline)
+### Day 4 — VSCode 插件 + 分层上下文管线 (Context Pipeline)
 
 ---
 
-#### PR #13：Context Pipeline 框架 + Layer 1-2
+#### PR #13：VSCode 插件 — IDE 集成与可视化
+
+**标题**：实现 Insightor VSCode 扩展——IDE 内一键审查、结果可视化、人机协同
+
+**功能描述**：
+将 Insightor 核心能力封装为 VSCode 扩展（TypeScript），在 IDE 内提供完整的 PR 审查工作流。插件通过调用 `insightor` CLI（子进程）或直接 import Python API 与核心通信。**同时**为后续 PR #14-16（分层上下文管线）预留扩展点，确保 Context Pipeline 完成后可直接合并到本分支。
+
+**架构设计**：
+
+```
+VSCode Extension (TypeScript)              Insightor Core (Python)
+═══════════════════════════                ═══════════════════════
+┌─────────────────────────┐               ┌──────────────────────┐
+│  Command Palette         │               │  CLI (click)         │
+│  ├── insightor.full      │──subprocess──▶│  insightor full ...  │
+│  ├── insightor.review    │               │  insightor review .. │
+│  ├── insightor.describe  │               │  insightor publish . │
+│  ├── insightor.risks     │               └──────────┬───────────┘
+│  ├── insightor.improve   │                          │
+│  └── insightor.publish   │               ┌──────────▼───────────┐
+├─────────────────────────┤               │  ReviewPipeline       │
+│  Webview Panel           │               │  .run(pr_url, tool,   │
+│  ├── 四段式结果展示       │◀──JSON/UDP───│   depth, ...)         │
+│  ├── 代码 diff 高亮       │               │   → ReviewResult     │
+│  ├── Feedback checkbox   │               └──────────┬───────────┘
+│  └── 一键 publish 按钮    │                          │
+├─────────────────────────┤               ┌──────────▼───────────┐
+│  Status Bar              │               │  URF (ReviewResult)   │
+│  └── 审查进度/评分        │               │  .insightor/reviews/  │
+├─────────────────────────┤               │  insightor-*.md       │
+│  Diagnostics Integration │               └──────────────────────┘
+│  └── Finding → Problem   │
+└─────────────────────────┘
+```
+
+**稳定核心 API 契约（PR #14-16 必须保持兼容）**：
+
+```python
+# ===== 契约 1: CLI 接口（不变）=====
+# insightor full <url> [--depth] [--skip] [--debug]
+# insightor review <url> [--depth] [--incremental] [--debug]
+# insightor describe <url> [--depth] [--debug]
+# insightor risks <url> [--depth] [--focus] [--debug]
+# insightor improve <url> [--depth] [--committable-only] [--debug]
+# insightor publish <md_path> [--dry-run] [--json]
+
+# ===== 契约 2: Python API（向后兼容扩展）=====
+class ReviewPipeline:
+    async def run(
+        self,
+        pr_url: str,
+        tool: str = "review",           # "review"|"describe"|"risks"|"improve"
+        depth: str = "standard",         # "quick"|"standard"|"deep"
+        incremental: bool = False,
+        on_progress: Callable = None,
+        # ★ PR #14-16 新增（可选，有默认值）:
+        # context_layers: list[str] | None = None,
+        # context_config: ContextConfig | None = None,
+    ) -> ReviewResult: ...
+
+# ===== 契约 3: URF 数据格式（仅允许增量字段）=====
+# ReviewResult / Finding / ReviewMeta — 现有字段不变
+# PR #14-16 可新增: context_summary: ContextSummary | None
+# 不可删除或重命名现有字段
+
+# ===== 契约 4: 文件路径约定（不变）=====
+# 审查结果 JSON:  .insightor/reviews/insightor-review-{pr_num}-{sha}-{ts}.json
+# 审查报告 MD:    insightor-review-{pr_num}.md
+# Full 报告 MD:   insightor-full-review-{pr_num}.md
+# 质量数据:       .insightor/quality/
+```
+
+**VSCode 扩展涉及接口**：
+
+```typescript
+// ===== 扩展入口 =====
+// package.json: contributes.commands, contributes.menus, contributes.views
+export function activate(context: vscode.ExtensionContext): void;
+
+// ===== Insightor Bridge（Python 通信层）=====
+class InsightorBridge {
+    constructor(pythonPath: string, cwd: string);
+    // 子进程方式调用 CLI
+    async runCommand(args: string[], onProgress?: (msg: string) => void): Promise<CommandResult>;
+    // 读取已生成的 JSON 结果
+    async loadResult(prNum: string): Promise<ReviewResult | null>;
+    // 获取质量指标
+    async getQualityMetrics(): Promise<QualityMetrics | null>;
+}
+
+// ===== Webview Provider =====
+class InsightorReviewPanel {
+    constructor(context: vscode.ExtensionContext);
+    // 显示四段式审查结果
+    showFullReview(markdownPath: string, reviewResult: ReviewResult): void;
+    // 显示单工具结果
+    showToolResult(tool: string, result: ReviewResult): void;
+    // 处理 feedback checkbox 交互
+    onFeedbackChanged(findingId: string, status: string): void;
+    // 一键 publish
+    publishReview(markdownPath: string): void;
+}
+
+// ===== Status Bar =====
+class InsightorStatusBar {
+    showProgress(tool: string, message: string): void;
+    showScore(score: number, recommendation: string): void;
+    hide(): void;
+}
+
+// ===== Diagnostics Integration =====
+class FindingDiagnostics {
+    // 将 Finding 映射为 VSCode Diagnostic (Problem tab)
+    static toDiagnostic(finding: Finding): vscode.Diagnostic;
+    static updateCollection(uri: vscode.Uri, findings: Finding[]): void;
+}
+```
+
+**目录结构（仅新增文件，不修改 insightor/）**：
+
+```
+vscode/
+├── package.json              # VSCode 扩展清单
+├── tsconfig.json
+├── src/
+│   ├── extension.ts          # 入口：activate/deactivate
+│   ├── bridge/
+│   │   └── insightorBridge.ts # Python 通信层
+│   ├── panels/
+│   │   └── reviewPanel.ts    # Webview 面板
+│   ├── providers/
+│   │   ├── statusBar.ts      # 状态栏
+│   │   └── diagnostics.ts    # Problem tab 集成
+│   ├── commands/
+│   │   ├── fullCommand.ts
+│   │   ├── reviewCommand.ts
+│   │   ├── describeCommand.ts
+│   │   ├── risksCommand.ts
+│   │   ├── improveCommand.ts
+│   │   └── publishCommand.ts
+│   └── utils/
+│       ├── urfTypes.ts        # TypeScript URF 类型定义
+│       └── config.ts          # VSCode 配置读取
+└── .vscodeignore
+```
+
+**并行开发策略（PR #13 ↔ PR #14-16）**：
+
+```
+                    main (feature/fetch_pr)
+                         │
+                    ┌────┴────┐
+                    │         │
+              feature/    feature/
+              pr13-vscode pr14-context  ← 用户从这里开始
+                    │         │
+                    │    feature/pr15-context
+                    │         │
+                    │    feature/pr16-context
+                    │         │
+                    └────┬────┘
+                         │  PR #16 合并到 PR #13
+                         ▼
+                  feature/pr13-vscode
+                  (含完整 Context Pipeline)
+                         │
+                         ▼
+                       main
+```
+
+**关键原则**：
+- PR #13 只新增 `vscode/` 目录，不修改 `insightor/` 中任何文件
+- PR #14-16 修改 `insightor/` 但遵守稳定 API 契约
+- 最终 PR #16 → PR #13 合并时，两边修改的是不同文件 → 零冲突
+- 若需修改契约，先在 `docs/architecture-final.md` 更新，双方同步
+
+**测试方式**：
+- VSCode 扩展单元测试（TypeScript — mocha/chai）
+- Python Bridge 子进程调用测试
+- Webview 渲染测试
+- 端到端：VSCode 内 `insightor.full` → Webview 展示 → 编辑 feedback → publish
+
+---
+
+#### PR #14：Context Pipeline 框架 + Layer 1-2
 
 **标题**：实现分层上下文管线框架——Diff 上下文与文件上下文扩展
 
 **功能描述**：
-建立分层上下文管线基础框架。实现 Layer 1（Diff 上下文源）和 Layer 2（文件上下文扩展——import 解析、hunk ±N 行扩展）。定义 ContextSource 协议、ContextChunk、AssembledContext 数据结构。
+建立分层上下文管线基础框架。实现 Layer 1（Diff 上下文源）和 Layer 2（文件上下文扩展——import 解析、hunk ±N 行扩展）。定义 ContextSource 协议、ContextChunk、AssembledContext 数据结构。**注意**：本 PR 以 PR #13（VSCode 插件）分支为合入目标。
 
 **涉及接口**：
 
@@ -1039,6 +1357,20 @@ class ContextPipeline:
     def allocate_budget(self, depth) -> dict[str, int]: ...
 ```
 
+**实际实现文件**：
+```
+insightor/processing/
+├── context/
+│   ├── __init__.py        # 导出 ContextPipeline, ContextSource 等
+│   ├── protocol.py         # ContextSource, ContextChunk, AssembledContext
+│   ├── pipeline.py         # ContextPipeline
+│   ├── sources/
+│   │   ├── diff.py         # DiffContextSource (Layer 1)
+│   │   └── file_context.py # FileContextSource (Layer 2)
+```
+
+**对 PR #13 契约的影响**：零影响。仅新增 `insightor/processing/context/` 包，不修改现有接口。
+
 **测试方式**：
 - Layer 1: diff 上下文正确组装
 - Layer 2: import 解析准确性；hunk 扩展行数正确
@@ -1046,7 +1378,7 @@ class ContextPipeline:
 
 ---
 
-#### PR #14：Layer 3-4 — Issue 关联 + 关联文件发现 (Aider PageRank)
+#### PR #15：Layer 3-4 — Issue 关联 + 关联文件发现 (Aider PageRank)
 
 **标题**：实现 Issue 上下文与 Aider 启发式关联文件发现
 
@@ -1113,12 +1445,12 @@ class RelatedFileSource:
 
 ---
 
-#### PR #15：Layer 5 — 仓库结构分析 (Aider Repo Map)
+#### PR #16：Layer 5 + Context Pipeline 集成
 
-**标题**：实现仓库结构分析层——AST 仓库地图与项目约定检测
+**标题**：实现仓库结构分析层，并将分层上下文管线完整接入 Review Pipeline
 
 **功能描述**：
-Layer 5 对全仓库进行 AST 分析，生成仓库地图。包含：全仓库符号索引、影响范围分析、项目约定检测（.insightor.yml 中的 conventions 自动校验）、对外 API 调用方发现。
+Layer 5 对全仓库进行 AST 分析，生成仓库地图。将 PR #14-15 的 Context Pipeline 集成到 ReviewPipeline.run() 中。按 AnalysisDepth 控制启用层（quick: L1/L2, standard: L1-L4, deep: L1-L5）。context_summary 填充到 ReviewResult。Token 预算自动分配。**本 PR 最终合并到 PR #13（VSCode 插件）分支**，使 VSCode 插件获得完整 Context Pipeline 能力。
 
 **涉及接口**：
 
@@ -1132,28 +1464,15 @@ class RepoAnalysisSource:
     # 3. 仓库地图生成
     # 4. 影响范围分析
     # 5. 项目约定检测
-```
 
-**测试方式**：
-- 仓库地图生成完整性
-- 影响范围分析准确性
-- 约定检测覆盖
-
----
-
-#### PR #16：Context Pipeline 集成
-
-**标题**：将分层上下文管线接入 Review Pipeline
-
-**功能描述**：
-将 PR #13-15 的 Context Pipeline 集成到 ReviewPipeline.run() 中。按 AnalysisDepth 控制启用层（quick: L1/L2, standard: L1-L4, deep: L1-L5）。context_summary 填充到 ReviewResult。Token 预算自动分配。
-
-**涉及接口**：
-
-```python
+# ===== ReviewPipeline 增强 =====
 class ReviewPipeline:
-    async def run(self, pr_url, tool, depth, ...) -> ReviewResult:
-        # Step 2.5: 构建上下文
+    async def run(
+        self, pr_url, tool, depth, ...,
+        context_layers: list[str] | None = None,   # ★ 新增（可选）
+        context_config: ContextConfig | None = None, # ★ 新增（可选）
+    ) -> ReviewResult:
+        # Step 2.5: 构建上下文（仅当 context_layers 非空）
         ctx_pipeline = ContextPipeline(sources=[...], token_budget=...)
         assembled = await ctx_pipeline.gather(pr_info, files, depth)
         # assembled.chunks → 注入 prompt
@@ -1169,11 +1488,21 @@ standard    ✅  ✅  ✅  ✅
 deep        ✅  ✅  ✅  ✅  ✅
 ```
 
+**合并到 PR #13 的保证**：
+- `ReviewPipeline.run()` 新增参数均有默认值 → 现有调用无需修改
+- `ReviewResult` 新增 `context_summary` 字段为可选 → 反序列化兼容
+- 所有新增文件在 `insightor/processing/context/` 下 → 不与 `vscode/` 冲突
+
 **测试方式**：
 - quick/standard/deep 三层上下文正确启用
 - context_summary 字段完整填充
 - Token 预算不超限
-- 端到端：`python scripts/review.py <PR_URL> --depth deep` 验证多层上下文效果
+- 端到端：`insightor full <PR_URL> --depth deep` 验证多层上下文效果
+- 合并验证：PR #16 合并到 PR #13 后，VSCode 插件仍正常运行
+
+---
+
+### Day 5 — 产品化与文档
 
 ---
 
@@ -1211,9 +1540,9 @@ PR #1 (工程 + 配置 + URF v3)  ← 基础，所有 PR 依赖
     │
     ├── PR #2 (GitHub Provider)
     │     │
-    │     └── PR #3 (Diff + ContextPipeline)  ← ★ 增强
+    │     └── PR #3 (Diff Processing)
     │           │
-    │           └── PR #6 (核心管线 + 流式) ← ★ 增强
+    │           └── PR #6 (核心管线)
     │                 │
     │     ┌───────────┼───────────┐
     │     │           │           │
@@ -1224,27 +1553,43 @@ PR #1 (工程 + 配置 + URF v3)  ← 基础，所有 PR 依赖
     │                 │
     │           PR #10 (Output 基础)
     │                 │
-    │           PR #11 (人机协同 + 反馈) ← ★ 增强
+    │           PR #11 (人机协同 + 反馈)
     │                 │
-    │           PR #12 (CLI)
+    │           PR #12 (CLI + full 命令)
     │                 │
-    │     ┌───────────┼───────────┐
-    │     │           │           │
-    │  PR #13      PR #14     PR #15
-    │ (Ctx L1-2)  (Ctx L3-4) (Ctx L5)
-    │     │           │           │
-    │     └───────────┼───────────┘
-    │                 │
-    │           PR #16 (Ctx 集成)
+    │     ┌───────────┴───────────┐
+    │     │  ★ 并行开发（不同文件）  │
+    │     │                       │
+    │  PR #13 (VSCode 插件)    PR #14 (Ctx L1-2)
+    │  只新增 vscode/         新增 processing/context/
+    │     │                       │
+    │     │                  PR #15 (Ctx L3-4)
+    │     │                  新增 tree-sitter 等
+    │     │                       │
+    │     │                  PR #16 (Ctx L5 + 集成)
+    │     │                  修改 pipeline.py
+    │     │                       │
+    │     └───────────┬───────────┘
+    │                 │  PR #16 合并到 PR #13
+    │                 ▼
+    │           PR #13 + PR #16
+    │           (VSCode 插件 + 完整 Ctx Pipeline)
     │                 │
     │           PR #17 (Web UI, 可选)
     │                 │
     │           PR #18 (文档 + 集成测试)
     │
-    └── PR #4 (AI 客户端 + 流式)  ← ★ 增强
+    └── PR #4 (AI 客户端 + 流式)
           │
-          └── PR #5 (Prompt + StreamParser)  ← ★ 增强
+          └── PR #5 (Prompt + StreamParser 计划)
 ```
+
+**并行开发说明**：
+
+- **PR #13（VSCode 插件）** 只新增 `vscode/` 目录，不修改 `insightor/`
+- **PR #14-16（Context Pipeline）** 新增 `insightor/processing/context/`，修改 `pipeline.py`（向后兼容）
+- 两分支修改的文件互不重叠 → 最终 PR #16 可直接合并到 PR #13 分支
+- 稳定 API 契约：CLI 参数不变、ReviewResult 字段只增不删、ReviewPipeline.run() 新参数有默认值
 
 ---
 
@@ -1264,6 +1609,6 @@ PR #1 (工程 + 配置 + URF v3)  ← 基础，所有 PR 依赖
 |------|-----|------|---------|
 | **Day 1** | #1, #2, #3, #4 | 基础层：工程+URF+Provider+Diff处理+AI | 7-9h |
 | **Day 2** | #5, #6, #7, #8 | 核心引擎：Prompt+Parser+管线+总结+风险+MR | 7-9h |
-| **Day 3** | #9, #10, #11 | 特性完善：建议+Output+人机协同+反馈 | 7-9h |
-| **Day 4** | #12, #13, #14, #15, #16 | Context Pipeline + CLI：分层上下文(5层)+集成 | 7-9h |
-| **Day 5** | #17(可选), #18 | 产品化：Web+文档 | 4-6h |
+| **Day 3** | #9, #10, #11, #12 | 特性完善：建议+Output+人机协同+CLI | 7-9h |
+| **Day 4** | #13 + #14-16 (并行) | VSCode 插件 ∥ Context Pipeline (并行开发) | 10-14h (2人) |
+| **Day 5** | #17(可选), #18 | 产品化：Web+文档+集成测试 | 4-6h |
