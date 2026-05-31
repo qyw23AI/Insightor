@@ -8,71 +8,50 @@ interface Props {
   overallDone: boolean;
 }
 
-const STEP_ICONS: Record<string, string> = {
-  '获取 PR 数据': '📥',
-  '处理代码变更': '🔧',
-  '优化输入': '⚙️',
-  '构建分析提示': '📋',
-  'AI 分析': '🤖',
-  '解析分析结果': '🔍',
-  '保存结果': '💾',
-  '输出结果': '📊',
-};
-
 const STEP_LABELS = [
-  { key: '获取 PR 数据', label: '获取 PR 数据' },
-  { key: '处理代码变更', label: '处理代码变更' },
-  { key: '优化输入', label: '优化输入' },
-  { key: '构建分析提示', label: '构建分析提示' },
-  { key: 'AI 分析', label: 'AI 分析' },
-  { key: '解析分析结果', label: '解析分析结果' },
-  { key: '保存结果', label: '保存结果' },
-  { key: '输出结果', label: '输出结果' },
+  'Fetching PR data',
+  'Processing changes',
+  'Optimizing input',
+  'Building prompt',
+  'AI analysis',
+  'Parsing results',
+  'Saving results',
+  'Finalizing',
 ];
 
-function getStepIcon(step: string): string {
-  for (const [key, icon] of Object.entries(STEP_ICONS)) {
-    if (step.includes(key)) return icon;
+function getStepIndex(step: string): number {
+  for (let i = 0; i < STEP_LABELS.length; i++) {
+    if (step.toLowerCase().includes(STEP_LABELS[i].toLowerCase().split(' ')[0])) return i;
   }
-  return '⏳';
-}
-
-function getStepKey(step: string): string {
-  for (const s of STEP_LABELS) {
-    if (step.includes(s.key)) return s.key;
-  }
-  return '';
+  return -1;
 }
 
 function StepTimeline({ job }: { job: JobProgress }) {
-  const currentKey = getStepKey(job.step);
-  const currentIdx = STEP_LABELS.findIndex(s => s.key === currentKey);
+  const currentIdx = getStepIndex(job.step);
   const isRunning = job.status === 'running';
 
   return (
     <div className="space-y-0.5">
-      {STEP_LABELS.map((s, i) => {
+      {STEP_LABELS.map((label, i) => {
         const isPast = isRunning && i < currentIdx;
         const isCurrent = isRunning && i === currentIdx;
-        const isFuture = isRunning && i > currentIdx;
-        const isAllDone = job.status === 'done';
+        const isDone = job.status === 'done';
 
         return (
           <div
-            key={s.key}
-            className={`flex items-center gap-2 px-1 py-0.5 rounded text-xs transition-colors ${
-              isPast || isAllDone ? 'text-green-400/70' :
-              isCurrent ? 'text-blue-400' :
-              'text-surface-200/25'
+            key={label}
+            className={`flex items-center gap-2 px-1 py-0.5 rounded text-2xs transition-colors ${
+              isPast || isDone ? 'text-success/70' :
+              isCurrent ? 'text-primary' :
+              'text-faint/40'
             }`}
           >
-            <span className="w-4 text-center flex-shrink-0">
-              {isPast || isAllDone ? '✓' :
-               isCurrent ? <span className="inline-block animate-spin">⚡</span> :
+            <span className="w-3 text-center flex-shrink-0">
+              {isPast || isDone ? '✓' :
+               isCurrent ? '●' :
                '·'}
             </span>
-            <span className="flex-shrink-0 text-xs">{STEP_ICONS[s.key] || '⏳'}</span>
-            <span className="flex-1 truncate">{s.label}</span>
+            <span className="flex-1 truncate">{label}</span>
           </div>
         );
       })}
@@ -81,40 +60,41 @@ function StepTimeline({ job }: { job: JobProgress }) {
 }
 
 function JobCard({ job }: { job: JobProgress }) {
-  const statusColors: Record<string, string> = {
-    pending: 'bg-surface-700 border-surface-600',
-    running: 'bg-blue-600/10 border-blue-500/30',
-    done: 'bg-green-600/10 border-green-500/30',
-    error: 'bg-red-600/10 border-red-500/30',
+  const statusBorder: Record<string, string> = {
+    pending: 'border-border',
+    running: 'border-primary/25',
+    done: 'border-success/20',
+    error: 'border-error/20',
   };
 
-  const statusDot: Record<string, string> = {
-    pending: 'bg-surface-400',
-    running: 'bg-blue-400 animate-pulse',
-    done: 'bg-green-400',
-    error: 'bg-red-400',
+  const statusBg: Record<string, string> = {
+    pending: 'bg-app-surface',
+    running: 'bg-primary/4',
+    done: 'bg-success/3',
+    error: 'bg-error/3',
+  };
+
+  const dotColor: Record<string, string> = {
+    pending: 'bg-faint',
+    running: 'bg-primary animate-pulse-subtle',
+    done: 'bg-success',
+    error: 'bg-error',
   };
 
   return (
-    <div className={`border rounded-xl p-4 transition-all duration-300 ${statusColors[job.status] || statusColors.pending}`}>
+    <div className={`border rounded-lg p-4 transition-all duration-300 ${statusBorder[job.status] || statusBorder.pending} ${statusBg[job.status] || statusBg.pending}`}>
       {/* Header */}
       <div className="flex items-center gap-2.5 mb-3">
-        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${statusDot[job.status] || statusDot.pending}`} />
-        <span className="text-sm font-semibold text-white truncate">
+        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${dotColor[job.status] || dotColor.pending}`} />
+        <span className="text-sm font-medium text-ink truncate">
           {job.repo}#{job.prNumber}
         </span>
-        {job.status === 'running' && (
-          <span className="text-xs text-blue-400 ml-auto flex-shrink-0 animate-pulse">running</span>
-        )}
-        {job.status === 'done' && (
-          <span className="text-xs text-green-400 ml-auto flex-shrink-0">✓ Done</span>
-        )}
-        {job.status === 'error' && (
-          <span className="text-xs text-red-400 ml-auto flex-shrink-0">✗ Failed</span>
-        )}
-        {job.status === 'pending' && (
-          <span className="text-xs text-surface-200/40 ml-auto flex-shrink-0">queued</span>
-        )}
+        <span className="text-2xs ml-auto flex-shrink-0">
+          {job.status === 'running' && <span className="text-primary">running</span>}
+          {job.status === 'done' && <span className="text-success">Done</span>}
+          {job.status === 'error' && <span className="text-error">Failed</span>}
+          {job.status === 'pending' && <span className="text-faint">queued</span>}
+        </span>
       </div>
 
       {/* Step timeline */}
@@ -122,28 +102,28 @@ function JobCard({ job }: { job: JobProgress }) {
 
       {/* Error message */}
       {job.status === 'error' && job.error && (
-        <p className="mt-2 text-xs text-red-400/80 truncate">{job.error}</p>
+        <p className="mt-2 text-2xs text-error/80 truncate">{job.error}</p>
       )}
 
       {/* Findings counter */}
       {job.findings.length > 0 && (
-        <div className="mt-2 text-xs text-blue-400">
-          🔎 {job.findings.length} finding{job.findings.length > 1 ? 's' : ''} so far
+        <div className="mt-2 text-2xs text-primary">
+          {job.findings.length} finding{job.findings.length > 1 ? 's' : ''} so far
         </div>
       )}
 
       {/* Result summary for done jobs */}
       {job.status === 'done' && job.resultSummary && (
-        <div className="mt-3 flex flex-wrap gap-2 text-xs">
-          <span className="px-2 py-0.5 rounded bg-surface-700 text-green-400">
+        <div className="mt-3 flex flex-wrap gap-2 text-2xs">
+          <span className="px-2 py-0.5 rounded bg-app-surface-high text-success">
             {job.resultSummary.findings_count} findings
           </span>
           {job.resultSummary.meta && (
             <>
-              <span className="px-2 py-0.5 rounded bg-surface-700 text-cyan-400">
-                {String((job.resultSummary.meta as Record<string, unknown>).tokens_used ?? 0)} tokens
+              <span className="px-2 py-0.5 rounded bg-app-surface-high text-accent tabular-nums">
+                {(job.resultSummary.meta as Record<string, unknown>).tokens_used as number ?? 0} tokens
               </span>
-              <span className="px-2 py-0.5 rounded bg-surface-700 text-purple-400">
+              <span className="px-2 py-0.5 rounded bg-app-surface-high text-muted tabular-nums">
                 {(() => {
                   const ms = (job.resultSummary.meta as Record<string, unknown>).duration_ms as number || 0;
                   return ms > 60000 ? `${(ms / 60000).toFixed(1)}m` : `${(ms / 1000).toFixed(1)}s`;
@@ -152,12 +132,12 @@ function JobCard({ job }: { job: JobProgress }) {
             </>
           )}
           {job.resultSummary.merge_readiness && (
-            <span className={`px-2 py-0.5 rounded text-white ${
+            <span className={`px-2 py-0.5 rounded text-white tabular-nums ${
               (job.resultSummary.merge_readiness as Record<string, unknown>).score as number >= 70
-                ? 'bg-green-600/30'
+                ? 'bg-success/25'
                 : (job.resultSummary.merge_readiness as Record<string, unknown>).score as number >= 40
-                ? 'bg-yellow-600/30'
-                : 'bg-red-600/30'
+                ? 'bg-warning/25'
+                : 'bg-error/25'
             }`}>
               Score: {String((job.resultSummary.merge_readiness as Record<string, unknown>).score)}
             </span>
@@ -183,26 +163,24 @@ export default function ProgressOverlay({ jobs, overallProgress, overallDone }: 
   if (jobList.length === 0) return null;
 
   return (
-    <div className="card space-y-4 animate-in fade-in">
+    <div className="card space-y-4 animate-slide-up">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-600/20 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
             {overallDone ? (
-              <span className="text-xl">✅</span>
-            ) : runningCount > 0 ? (
-              <span className="animate-spin text-xl">⚡</span>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-success"><polyline points="20 6 9 17 4 12" /></svg>
             ) : (
-              <span className="text-xl">📊</span>
+              <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             )}
           </div>
           <div>
-            <h3 className="font-semibold text-white text-lg">
+            <h3 className="font-semibold text-ink">
               {overallDone
-                ? `Analysis Complete`
+                ? 'Analysis complete'
                 : `Analyzing ${jobList.length} PR${jobList.length > 1 ? 's' : ''}...`}
             </h3>
-            <p className="text-sm text-surface-200/50">
+            <p className="text-xs text-muted">
               {runningCount > 0 && `${runningCount} running · `}
               {doneCount} done · {errorCount} failed
               {overallDone && totalTokens > 0 && ` · ${totalTokens.toLocaleString()} tokens used`}
@@ -211,8 +189,8 @@ export default function ProgressOverlay({ jobs, overallProgress, overallDone }: 
         </div>
         {!overallDone && (
           <div className="text-right">
-            <div className="text-2xl font-bold text-blue-400">{overallProgress}%</div>
-            <div className="text-xs text-surface-200/50">complete</div>
+            <div className="text-xl font-semibold text-primary tabular-nums">{overallProgress}%</div>
+            <div className="text-2xs text-muted">complete</div>
           </div>
         )}
       </div>
@@ -220,23 +198,22 @@ export default function ProgressOverlay({ jobs, overallProgress, overallDone }: 
       {/* Overall progress bar */}
       {!overallDone && (
         <div>
-          <div className="h-2.5 bg-surface-700 rounded-full overflow-hidden">
+          <div className="progress-bar">
             <div
-              className="h-full bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-400 rounded-full transition-all duration-700 ease-out"
+              className="progress-fill"
               style={{ width: `${overallProgress}%` }}
             />
           </div>
-          {/* Tick marks */}
           {jobList.length > 1 && (
-            <div className="flex justify-between mt-1.5">
-              {jobList.map((j, i) => (
+            <div className="flex justify-between mt-1.5 px-0.5">
+              {jobList.map((j) => (
                 <div
                   key={j.jobId}
-                  className={`w-2 h-2 rounded-full transition-colors duration-300 ${
-                    j.status === 'done' ? 'bg-green-400' :
-                    j.status === 'error' ? 'bg-red-400' :
-                    j.status === 'running' ? 'bg-blue-400 animate-pulse' :
-                    'bg-surface-600'
+                  className={`w-1.5 h-1.5 rounded-full transition-colors duration-300 ${
+                    j.status === 'done' ? 'bg-success' :
+                    j.status === 'error' ? 'bg-error' :
+                    j.status === 'running' ? 'bg-primary animate-pulse-subtle' :
+                    'bg-border'
                   }`}
                 />
               ))}
@@ -254,9 +231,9 @@ export default function ProgressOverlay({ jobs, overallProgress, overallDone }: 
 
       {/* Token usage summary */}
       {totalTokens > 0 && (
-        <div className="flex items-center justify-between pt-3 border-t border-surface-700 text-sm">
-          <span className="text-surface-200/60">Total tokens</span>
-          <span className="text-cyan-400 font-mono font-semibold">{totalTokens.toLocaleString()}</span>
+        <div className="flex items-center justify-between pt-3 border-t border-border text-sm">
+          <span className="text-muted">Total tokens</span>
+          <span className="text-accent font-mono font-medium tabular-nums">{totalTokens.toLocaleString()}</span>
         </div>
       )}
     </div>

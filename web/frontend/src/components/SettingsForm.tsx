@@ -15,9 +15,9 @@ const CONFIG_FIELDS = [
 ];
 
 const MODEL_FIELDS = [
-  { key: 'INSIGHTOR_MODELS_PRIMARY', label: 'Primary Model (standard)', placeholder: 'deepseek-v4-pro' },
-  { key: 'INSIGHTOR_MODELS_WEAK', label: 'Weak Model (quick)', placeholder: 'deepseek-v4-flash' },
-  { key: 'INSIGHTOR_MODELS_REASONING', label: 'Reasoning Model (deep)', placeholder: 'deepseek-v4-pro' },
+  { key: 'INSIGHTOR_MODELS_PRIMARY', label: 'Primary model (standard)', placeholder: 'deepseek-v4-pro' },
+  { key: 'INSIGHTOR_MODELS_WEAK', label: 'Weak model (quick)', placeholder: 'deepseek-v4-flash' },
+  { key: 'INSIGHTOR_MODELS_REASONING', label: 'Reasoning model (deep)', placeholder: 'deepseek-v4-pro' },
 ];
 
 export default function SettingsForm() {
@@ -46,7 +46,7 @@ export default function SettingsForm() {
       await saveConfig(token, configs);
       const msk = await getConfigMasked(token);
       setMasked(msk);
-      setMessage('Saved successfully!');
+      setMessage('Saved');
       setTimeout(() => setMessage(''), 3000);
     } catch (e: unknown) {
       setMessage(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
@@ -56,12 +56,13 @@ export default function SettingsForm() {
 
   return (
     <div className="space-y-8">
+      {/* API Keys */}
       <div className="card space-y-4">
-        <h2 className="text-lg font-bold text-white">🔑 API Keys & Tokens</h2>
-        <p className="text-sm text-surface-200/60">Your credentials are encrypted before storage.</p>
+        <h2 className="text-sm font-semibold text-ink">API keys & tokens</h2>
+        <p className="text-xs text-muted">Your credentials are encrypted before storage.</p>
         {CONFIG_FIELDS.map(field => (
           <div key={field.key}>
-            <label className="block text-sm font-medium text-surface-200/80 mb-1.5">{field.label}</label>
+            <label className="block text-xs font-medium text-muted mb-1.5">{field.label}</label>
             <div className="relative">
               <input
                 type="password"
@@ -71,18 +72,19 @@ export default function SettingsForm() {
                 className="input font-mono text-sm"
               />
               {masked[field.key] && !configs[field.key] && (
-                <p className="text-xs text-surface-200/50 mt-1">Current: {masked[field.key]}</p>
+                <p className="text-2xs text-faint mt-1">Current: {masked[field.key]}</p>
               )}
             </div>
           </div>
         ))}
       </div>
 
+      {/* Model config */}
       <div className="card space-y-4">
-        <h2 className="text-lg font-bold text-white">🤖 Model Configuration</h2>
+        <h2 className="text-sm font-semibold text-ink">Model configuration</h2>
         {MODEL_FIELDS.map(field => (
           <div key={field.key}>
-            <label className="block text-sm font-medium text-surface-200/80 mb-1.5">{field.label}</label>
+            <label className="block text-xs font-medium text-muted mb-1.5">{field.label}</label>
             <input
               type="text"
               placeholder={field.placeholder}
@@ -96,10 +98,10 @@ export default function SettingsForm() {
 
       <div className="flex items-center gap-4">
         <button onClick={handleSave} disabled={saving} className="btn-primary">
-          {saving ? 'Saving...' : 'Save Configuration'}
+          {saving ? 'Saving...' : 'Save configuration'}
         </button>
         {message && (
-          <span className={`text-sm ${message.startsWith('Error') ? 'text-red-400' : 'text-green-400'}`}>
+          <span className={`text-xs ${message.startsWith('Error') ? 'text-error' : 'text-success'}`}>
             {message}
           </span>
         )}

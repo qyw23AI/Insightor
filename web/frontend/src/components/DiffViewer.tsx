@@ -11,10 +11,6 @@ interface FileDiff {
   deletions: number;
 }
 
-/**
- * Parse unified diff string into per-file sections.
- * Supports "diff --git a/... b/..." and "--- a/... / +++ b/..." headers.
- */
 function parseDiff(diffText: string): FileDiff[] {
   const files: FileDiff[] = [];
   const lines = diffText.split('\n');
@@ -23,22 +19,13 @@ function parseDiff(diffText: string): FileDiff[] {
   let headerLines: string[] = [];
 
   for (const line of lines) {
-    // Detect new file section: "diff --git a/<path> b/<path>"
     const gitMatch = line.match(/^diff --git a\/(.+?) b\/(.+?)$/);
     if (gitMatch) {
-      // Flush previous file
       if (current) {
         current.hunks = currentLines.join('\n');
         files.push(current);
       }
       const filename = gitMatch[2] || gitMatch[1];
-      const addDel = currentLines.join('\n');
-      let adds = 0, dels = 0;
-      for (const l of currentLines) {
-        if (l.startsWith('+') && !l.startsWith('+++')) adds++;
-        if (l.startsWith('-') && !l.startsWith('---')) dels++;
-      }
-
       current = { filename, header: '', hunks: '', additions: 0, deletions: 0 };
       currentLines = [];
       headerLines = [line];
@@ -46,7 +33,6 @@ function parseDiff(diffText: string): FileDiff[] {
     }
 
     if (current) {
-      // Collect header lines (--- a/..., +++ b/..., rename from/to, etc.)
       if (headerLines.length < 10 && (line.startsWith('--- a/') || line.startsWith('+++ b/') ||
           line.startsWith('rename from ') || line.startsWith('rename to ') ||
           line.startsWith('new file ') || line.startsWith('deleted file ') ||
@@ -54,7 +40,6 @@ function parseDiff(diffText: string): FileDiff[] {
         headerLines.push(line);
         continue;
       }
-      // Record header once we hit the first hunk or content
       if (headerLines.length > 0) {
         current.header = headerLines.join('\n');
         headerLines = [];
@@ -63,7 +48,6 @@ function parseDiff(diffText: string): FileDiff[] {
     }
   }
 
-  // Flush last file
   if (current) {
     let adds = 0, dels = 0;
     for (const l of currentLines) {
@@ -79,14 +63,12 @@ function parseDiff(diffText: string): FileDiff[] {
   return files;
 }
 
-/** Sanitize filename into a valid DOM id. */
 function fileAnchorId(filename: string): string {
   return 'diff-' + filename.replace(/[^a-zA-Z0-9_-]/g, '-');
 }
 
 interface Props {
   diffText: string;
-  /** Optional: scroll to a specific file on mount. */
   scrollToFile?: string | null;
   onScrollDone?: () => void;
 }
@@ -95,19 +77,16 @@ export default function DiffViewer({ diffText, scrollToFile, onScrollDone }: Pro
   const files = useMemo(() => parseDiff(diffText), [diffText]);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
-  // Scroll to file anchor when scrollToFile changes
   useState(() => {
     if (scrollToFile) {
       const id = fileAnchorId(scrollToFile);
-      // Delay to let DOM render
       requestAnimationFrame(() => {
         const el = document.getElementById(id);
         if (el) {
           el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          // Highlight briefly
-          el.classList.add('ring-2', 'ring-blue-500/50');
+          el.classList.add('ring-spot');
           setTimeout(() => {
-            el.classList.remove('ring-2', 'ring-blue-500/50');
+            el.classList.remove('ring-spot');
             onScrollDone?.();
           }, 2000);
         }
@@ -124,20 +103,19 @@ export default function DiffViewer({ diffText, scrollToFile, onScrollDone }: Pro
   };
 
   if (files.length === 0) {
-    return <p className="text-center py-8 text-surface-200/50">No diff available for this review.</p>;
+    return <p className="text-center py-8 text-muted">No diff available for this review.</p>;
   }
 
-  // Stats
   const totalAdds = files.reduce((s, f) => s + f.additions, 0);
   const totalDels = files.reduce((s, f) => s + f.deletions, 0);
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       {/* Summary bar */}
-      <div className="flex items-center gap-3 text-xs text-surface-200/50 mb-3 px-1">
+      <div className="flex items-center gap-3 text-2xs text-faint mb-3 px-1">
         <span>{files.length} file{files.length > 1 ? 's' : ''}</span>
-        <span className="text-green-400">+{totalAdds}</span>
-        <span className="text-red-400">-{totalDels}</span>
+        <span className="text-success tabular-nums">+{totalAdds}</span>
+        <span className="text-error tabular-nums">-{totalDels}</span>
         <button
           onClick={() => {
             if (collapsed.size === files.length) {
@@ -146,7 +124,7 @@ export default function DiffViewer({ diffText, scrollToFile, onScrollDone }: Pro
               setCollapsed(new Set(files.map(f => f.filename)));
             }
           }}
-          className="ml-auto text-blue-400 hover:text-blue-300 transition-colors"
+          className="ml-auto text-accent hover:text-accent-hover transition-colors"
         >
           {collapsed.size === files.length ? 'Expand all' : 'Collapse all'}
         </button>
@@ -160,24 +138,27 @@ export default function DiffViewer({ diffText, scrollToFile, onScrollDone }: Pro
           <div
             key={i}
             id={cid}
-            className="border border-surface-700 rounded-lg overflow-hidden transition-all scroll-mt-20"
+            className="border border-border rounded-md overflow-hidden transition-all scroll-mt-20"
           >
-            {/* File header — clickable to toggle */}
+            {/* File header */}
             <button
               onClick={() => toggleCollapse(file.filename)}
-              className="w-full flex items-center gap-3 px-4 py-2.5 bg-surface-800 hover:bg-surface-700/80 transition-colors text-left"
+              className="w-full flex items-center gap-3 px-4 py-2.5 bg-app-surface hover:bg-app-surface-elevated transition-colors text-left"
             >
-              <span className="text-xs text-surface-200/40">
-                {isCollapsed ? '▶' : '▼'}
-              </span>
-              <code className="text-sm text-white flex-1 truncate">{file.filename}</code>
-              <span className="text-xs text-green-400 font-mono">+{file.additions}</span>
-              <span className="text-xs text-red-400 font-mono">-{file.deletions}</span>
+              <svg
+                width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                className={`text-faint transition-transform duration-200 ${isCollapsed ? '' : 'rotate-90'}`}
+              >
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+              <code className="text-xs text-ink flex-1 truncate">{file.filename}</code>
+              <span className="text-2xs text-success font-mono tabular-nums">+{file.additions}</span>
+              <span className="text-2xs text-error font-mono tabular-nums">-{file.deletions}</span>
             </button>
 
             {/* File content */}
             {!isCollapsed && (
-              <div className="border-t border-surface-700">
+              <div className="border-t border-border">
                 <CodeBlock code={(file.header ? file.header + '\n' : '') + file.hunks} language="diff" />
               </div>
             )}

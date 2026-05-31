@@ -1,4 +1,4 @@
-/* Review detail page with findings + diff */
+/* Review detail page — findings, diff, publish */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -9,6 +9,41 @@ import FeedbackPanel from '../components/FeedbackPanel';
 import DiffViewer, { fileAnchorId } from '../components/DiffViewer';
 import ScoreGauge from '../components/ScoreGauge';
 import type { Finding, FeedbackItem, FileWalkthrough } from '../types/urf';
+
+function LoadingSkeleton() {
+  return (
+    <div className="p-6 max-w-5xl mx-auto space-y-6">
+      <div className="space-y-2">
+        <div className="skeleton h-4 w-16" />
+        <div className="skeleton h-7 w-56" />
+        <div className="skeleton h-4 w-40" />
+      </div>
+      <div className="card space-y-3">
+        <div className="skeleton h-5 w-20" />
+        <div className="skeleton h-4 w-full" />
+        <div className="skeleton h-4 w-3/4" />
+      </div>
+      <div className="flex gap-3">
+        <div className="skeleton h-9 w-24" />
+        <div className="skeleton h-9 w-24" />
+      </div>
+      <div className="space-y-4">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="card space-y-3">
+            <div className="flex gap-2">
+              <div className="skeleton h-5 w-8" />
+              <div className="skeleton h-5 w-14" />
+              <div className="skeleton h-5 w-12" />
+            </div>
+            <div className="skeleton h-5 w-3/4" />
+            <div className="skeleton h-4 w-full" />
+            <div className="skeleton h-4 w-2/3" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function ReviewDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -67,21 +102,18 @@ export default function ReviewDetailPage() {
     setJumpToFile(filePath);
   };
 
-  // Scroll to file anchor after tab switches to diff and DOM renders
   useEffect(() => {
     if (!jumpToFile || tab !== 'diff') return;
     const anchorId = fileAnchorId(jumpToFile);
-    // Wait for React to render the diff tab content
     const frameId = requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         const el = document.getElementById(anchorId);
         if (el) {
           el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          // Highlight the target file block
-          el.classList.add('ring-2', 'ring-blue-500/50');
+          el.classList.add('ring-spot');
           if (jumpTimeoutRef.current) clearTimeout(jumpTimeoutRef.current);
           jumpTimeoutRef.current = setTimeout(() => {
-            el.classList.remove('ring-2', 'ring-blue-500/50');
+            el.classList.remove('ring-spot');
             setJumpToFile(null);
           }, 2000);
         } else {
@@ -94,26 +126,26 @@ export default function ReviewDetailPage() {
     };
   }, [jumpToFile, tab]);
 
-  // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
       if (jumpTimeoutRef.current) clearTimeout(jumpTimeoutRef.current);
     };
   }, []);
 
-  if (loading) {
-    return (
-      <div className="p-6 flex items-center justify-center h-full">
-        <p className="text-surface-200/40">Loading review...</p>
-      </div>
-    );
-  }
+  if (loading) return <LoadingSkeleton />;
 
   if (!review) {
     return (
       <div className="p-6 flex flex-col items-center justify-center h-full gap-4">
-        <p className="text-surface-200/40">Review not found</p>
-        <button onClick={() => navigate('/dashboard')} className="btn-ghost">Back to Dashboard</button>
+        <div className="w-16 h-16 rounded-2xl bg-app-surface flex items-center justify-center border border-border">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-faint">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+        </div>
+        <p className="text-muted text-sm font-medium">Review not found</p>
+        <button onClick={() => navigate('/dashboard')} className="btn-ghost text-sm">Back to dashboard</button>
       </div>
     );
   }
@@ -131,16 +163,18 @@ export default function ReviewDetailPage() {
   const sevs = ['critical', 'high', 'medium', 'low', 'info'];
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="p-6 max-w-5xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
-          <button onClick={() => navigate('/dashboard')} className="btn-ghost text-sm mb-2">← Back</button>
-          <h1 className="text-xl font-bold text-white">
-            Review #{meta?.pr_url ? (meta.pr_url as string).split('/').pop() : id?.slice(0, 8)}
+          <button onClick={() => navigate('/dashboard')} className="btn-ghost text-sm mb-2">
+            &larr; Back
+          </button>
+          <h1 className="text-lg font-semibold text-ink tracking-tight">
+            #{meta?.pr_url ? (meta.pr_url as string).split('/').pop() : id?.slice(0, 8)}
           </h1>
-          <p className="text-sm text-surface-200/60 mt-1">
-            {meta?.model as string} · {meta?.analysis_depth as string} · {meta?.duration_ms ? `${(meta.duration_ms as number / 1000).toFixed(0)}s` : ''}
+          <p className="text-sm text-muted mt-1">
+            {meta?.model as string} &middot; {meta?.analysis_depth as string} &middot; {meta?.duration_ms ? `${(meta.duration_ms as number / 1000).toFixed(0)}s` : ''}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -148,48 +182,48 @@ export default function ReviewDetailPage() {
             <ScoreGauge score={mr.score as number} recommendation={(mr.recommendation as string) || ''} />
           )}
           {published ? (
-            <span className="px-3 py-1.5 rounded-lg bg-green-500/20 text-green-400 text-sm font-medium">Published</span>
+            <span className="badge badge-success text-xs">
+              Published
+            </span>
           ) : (
-            <button
-              onClick={handlePublish}
-              disabled={publishing}
-              className="btn-primary"
-            >
-              {publishing ? 'Publishing...' : '🚀 Publish to GitHub'}
+            <button onClick={handlePublish} disabled={publishing} className="btn-primary">
+              {publishing ? 'Publishing...' : 'Publish to GitHub'}
             </button>
           )}
         </div>
       </div>
 
-      {/* Summary */}
+      {/* Summary card */}
       {summary && (
         <div className="card">
-          <h3 className="font-semibold text-white mb-2">Summary</h3>
-          <p className="text-sm text-surface-200/80">{summary.overview as string}</p>
-          <p className="text-xs text-surface-200/50 mt-1">
-            {summary.pr_type as string} · {summary.files_changed as number} files changed (↑{summary.additions as number} ↓{summary.deletions as number})
-          </p>
+          <h3 className="font-semibold text-ink text-sm mb-2">Summary</h3>
+          <p className="text-sm text-muted leading-relaxed">{summary.overview as string}</p>
+          <div className="flex items-center gap-3 mt-3 text-xs text-faint">
+            <span>{summary.pr_type as string}</span>
+            <span>&middot;</span>
+            <span>{summary.files_changed as number} files (+{summary.additions as number} / -{summary.deletions as number})</span>
+          </div>
 
-          {/* File changes list */}
+          {/* File walkthrough */}
           {fileWalkthrough.length > 0 && (
-            <div className="mt-3 pt-3 border-t border-surface-700/50">
-              <h4 className="text-xs font-semibold text-surface-200/60 mb-2 uppercase tracking-wide">
-                Changed Files ({fileWalkthrough.length})
+            <div className="mt-3 pt-3 border-t border-border">
+              <h4 className="text-xs font-medium text-muted mb-2">
+                Changed files ({fileWalkthrough.length})
               </h4>
-              <div className="space-y-1.5 max-h-64 overflow-y-auto">
+              <div className="space-y-1 max-h-64 overflow-y-auto">
                 {fileWalkthrough.map((fw, i) => (
-                  <div key={i} className="flex items-start gap-2 text-xs group hover:bg-surface-700/30 rounded px-1.5 py-1 -mx-1.5 transition-colors">
-                    <span className={`mt-0.5 w-4 text-center flex-shrink-0 ${
-                      fw.edit_type === 'added' ? 'text-green-400' :
-                      fw.edit_type === 'deleted' ? 'text-red-400' :
-                      fw.edit_type === 'renamed' ? 'text-yellow-400' :
-                      'text-blue-400'
+                  <div key={i} className="flex items-start gap-2 text-xs group hover:bg-app-surface-elevated rounded-md px-1.5 py-1 -mx-1.5 transition-colors">
+                    <span className={`mt-0.5 w-4 text-center flex-shrink-0 font-mono text-2xs ${
+                      fw.edit_type === 'added' ? 'text-success' :
+                      fw.edit_type === 'deleted' ? 'text-error' :
+                      fw.edit_type === 'renamed' ? 'text-warning' :
+                      'text-accent'
                     }`}>
                       {fw.edit_type === 'added' ? '+' : fw.edit_type === 'deleted' ? '−' : fw.edit_type === 'renamed' ? '↻' : '~'}
                     </span>
-                    <code className="text-surface-200/90 flex-1 min-w-0 truncate">{fw.path}</code>
+                    <code className="text-muted flex-1 min-w-0 truncate text-2xs">{fw.path}</code>
                     {fw.summary && (
-                      <span className="text-surface-200/40 flex-shrink-0 hidden md:inline truncate max-w-[200px]">{fw.summary}</span>
+                      <span className="text-faint flex-shrink-0 hidden lg:inline truncate max-w-[240px] text-2xs">{fw.summary}</span>
                     )}
                   </div>
                 ))}
@@ -199,22 +233,25 @@ export default function ReviewDetailPage() {
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex border-b border-surface-700 gap-4">
+      {/* Tabs: Findings / Diff */}
+      <div className="flex border-b border-border gap-6">
         <button className={`tab ${tab === 'findings' ? 'active' : ''}`} onClick={() => setTab('findings')}>
           Findings ({findings.length})
         </button>
         <button className={`tab ${tab === 'diff' ? 'active' : ''}`} onClick={() => setTab('diff')}>
-          Diff View
+          Diff view
         </button>
       </div>
 
+      {/* Severity filter */}
       {tab === 'findings' && (
         <div className="flex gap-2 flex-wrap">
           <button
             onClick={() => setSeverityFilter('all')}
-            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-              severityFilter === 'all' ? 'bg-blue-600 text-white' : 'bg-surface-800 text-surface-200/60 hover:text-white'
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 ${
+              severityFilter === 'all'
+                ? 'bg-primary text-white'
+                : 'bg-app-surface text-muted hover:text-ink hover:bg-app-surface-elevated'
             }`}
           >
             All ({findings.length})
@@ -226,22 +263,25 @@ export default function ReviewDetailPage() {
               <button
                 key={s}
                 onClick={() => setSeverityFilter(s)}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                  severityFilter === s ? 'bg-blue-600 text-white' : 'bg-surface-800 text-surface-200/60 hover:text-white'
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 capitalize ${
+                  severityFilter === s
+                    ? 'bg-primary text-white'
+                    : 'bg-app-surface text-muted hover:text-ink hover:bg-app-surface-elevated'
                 }`}
               >
-                {s.toUpperCase()} ({count})
+                {s} ({count})
               </button>
             );
           })}
         </div>
       )}
 
+      {/* Findings list */}
       {tab === 'findings' && (
         <div className="space-y-4">
           {filteredFindings.length === 0 ? (
-            <div className="card text-center py-8">
-              <p className="text-surface-200/50">No findings in this category.</p>
+            <div className="empty-state">
+              <p className="text-sm text-muted">No findings in this category</p>
             </div>
           ) : (
             filteredFindings.map((f, i) => (
@@ -264,16 +304,17 @@ export default function ReviewDetailPage() {
         </div>
       )}
 
+      {/* Diff view */}
       {tab === 'diff' && (
-        <div className="card">
+        <div className="card !p-0 overflow-hidden">
           {diff ? (
-            <DiffViewer
-              diffText={diff}
-              scrollToFile={jumpToFile}
-              onScrollDone={() => setJumpToFile(null)}
-            />
+            <div className="p-5">
+              <DiffViewer diffText={diff} scrollToFile={jumpToFile} onScrollDone={() => setJumpToFile(null)} />
+            </div>
           ) : (
-            <p className="text-center py-8 text-surface-200/50">No diff available for this review.</p>
+            <div className="empty-state">
+              <p className="text-sm text-muted">No diff available for this review</p>
+            </div>
           )}
         </div>
       )}
