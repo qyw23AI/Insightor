@@ -1,10 +1,5 @@
-# Insightor
-
 <div align="center">
-
-![Insightor Logo](resources/icon.png)
-
-**AI 驱动的 GitHub PR 审查助手 **
+**Insightor：AI 驱动的 GitHub PR 审查助手 **
 
 [![VSCode](https://img.shields.io/badge/VSCode-1.85+-blue.svg)](https://code.visualstudio.com/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)](https://www.typescriptlang.org/)
