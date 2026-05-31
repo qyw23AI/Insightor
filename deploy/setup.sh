@@ -48,6 +48,31 @@ else
     chown -R "$APP_USER:$APP_USER" "$CONDA_DIR"
 fi
 
+# ---------- 3.5. 配置 conda (bashrc) ----------
+echo "[3.5/8] 配置 conda bashrc..."
+BASHRC_USER="/home/${APP_USER}/.bashrc"
+BASHRC_ROOT="/root/.bashrc"
+CONDA_SH="${CONDA_DIR}/etc/profile.d/conda.sh"
+
+for BASHRC in "$BASHRC_USER" "$BASHRC_ROOT"; do
+    if [ -f "$BASHRC" ]; then
+        sed -i '/# >>> conda initialize >>>/,/# <<< conda initialize <<</d' "$BASHRC"
+    fi
+    {
+        echo ""
+        echo "# >>> conda initialize >>>"
+        echo "export PATH=\"${CONDA_DIR}/bin:\$PATH\""
+        echo "if [ -f \"${CONDA_SH}\" ]; then"
+        echo "    . \"${CONDA_SH}\""
+        echo "fi"
+        echo "# <<< conda initialize <<<"
+    } >> "$BASHRC"
+done
+
+chown "$APP_USER:$APP_USER" "$BASHRC_USER"
+
+"${CONDA_DIR}/bin/conda" config --system --set auto_activate_base false
+
 # ---------- 4. 创建 conda 环境 ----------
 echo "[4/8] 创建 conda 环境: ${CONDA_ENV} (Python ${PYTHON_VERSION})..."
 if "${CONDA_DIR}/bin/conda" env list | grep -q "^${CONDA_ENV} "; then
@@ -60,9 +85,9 @@ fi
 if [ -d "$APP_DIR/.git" ]; then
     echo "[5/8] 代码已存在, 执行 git pull..."
     cd "$APP_DIR"
-    git fetch origin
-    git checkout "$BRANCH"
-    git reset --hard "origin/$BRANCH"
+    # git fetch origin
+    # git checkout "$BRANCH"
+    # git reset --hard "origin/$BRANCH"
 else
     echo "[5/8] 克隆仓库..."
     git clone --branch "$BRANCH" "$REPO_URL" "$APP_DIR"
@@ -77,8 +102,9 @@ cd "$APP_DIR"
 # ---------- 7. 构建前端 + 初始化数据库 ----------
 echo "[7/8] 构建前端 & 初始化数据库..."
 cd "$APP_DIR/web/frontend"
-npm install --production
+npm install
 npm run build
+npm prune --omit=dev
 
 cd "$APP_DIR"
 "${CONDA_DIR}/envs/${CONDA_ENV}/bin/python" -m web.backend.seed
