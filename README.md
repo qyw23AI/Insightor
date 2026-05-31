@@ -17,9 +17,13 @@
 
 # demo视频链接：
 
-### bilibili暂时待审
+## B站：
 
-### Google Drive：https://drive.google.com/file/d/17_mvx5ll6w_DfHpfPI-3EK21IcKg-BT1/view?usp=sharing
+### https://www.bilibili.com/video/BV1aTVQ6iEmM/?share_source=copy_web&vd_source=65a8d9eb822c3e11711d4a24239ad734
+
+## Google Drive（外网）：
+
+### https://drive.google.com/file/d/17_mvx5ll6w_DfHpfPI-3EK21IcKg-BT1/view?usp=sharing
 
 ---
 
