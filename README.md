@@ -13,9 +13,13 @@
 
 ## 🚀 快速开始
 
-网页输入：http://116.196.112.91:8000，最简开始
+## 网页输入：http://116.196.112.91:8000，最简开始
 
-demo视频链接：
+# demo视频链接：
+
+### bilibili暂时待审
+
+### Google Drive：https://drive.google.com/file/d/17_mvx5ll6w_DfHpfPI-3EK21IcKg-BT1/view?usp=sharing
 
 ---
 
