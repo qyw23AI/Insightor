@@ -170,10 +170,10 @@ export default function ReviewDetailPage() {
           <button onClick={() => navigate('/dashboard')} className="btn-ghost btn-sm mb-2 -ml-1">
             ← Back
           </button>
-          <h1 className="text-lg font-semibold text-ink tracking-tight">
+          <h1 className="text-xl font-semibold text-ink tracking-tight">
             #{meta?.pr_url ? (meta.pr_url as string).split('/').pop() : id?.slice(0, 8)}
           </h1>
-          <p className="text-xs text-muted mt-0.5">
+          <p className="text-sm text-muted mt-0.5">
             {meta?.model as string} &middot; {meta?.analysis_depth as string}
             {meta?.duration_ms ? ` · ${((meta.duration_ms as number) / 1000).toFixed(0)}s` : ''}
           </p>
@@ -194,14 +194,14 @@ export default function ReviewDetailPage() {
 
       {/* Summary card */}
       {summary && (
-        <div className="card space-y-2">
+        <div className="card space-y-3">
           <div className="flex items-baseline justify-between gap-4 flex-wrap">
-            <h3 className="text-sm font-semibold text-ink">{summary.pr_type as string}</h3>
-            <span className="text-xs text-faint tabular-nums">
+            <h3 className="text-base font-semibold text-ink">{summary.pr_type as string}</h3>
+            <span className="text-sm text-faint tabular-nums">
               {summary.files_changed as number} files &nbsp;+{summary.additions as number} / -{summary.deletions as number}
             </span>
           </div>
-          <p className="text-xs text-muted leading-relaxed">{summary.overview as string}</p>
+          <p className="text-sm text-muted leading-relaxed">{summary.overview as string}</p>
 
           {fileWalkthrough.length > 0 && (
             <div className="mt-1.5 pt-2.5 border-t border-border">

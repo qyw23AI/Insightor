@@ -61,25 +61,25 @@ export default function PREntryList({ entries, onBatchReview, onDelete, disabled
   const allSelected = selected.size === entries.length;
 
   return (
-    <div className="card space-y-2.5">
+    <div className="card space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-ink">
+        <h3 className="text-base font-semibold text-ink">
           Recent PRs
           <span className="text-faint font-normal ml-1.5">({entries.length})</span>
         </h3>
-        <button onClick={toggleAll} className="btn-ghost btn-sm text-xs">
+        <button onClick={toggleAll} className="btn-ghost text-sm">
           {allSelected ? 'Deselect all' : 'Select all'}
         </button>
       </div>
 
       {/* Entry rows */}
-      <div className="space-y-0.5 max-h-52 overflow-y-auto -mx-1 px-1">
+      <div className="space-y-0.5 max-h-56 overflow-y-auto -mx-1 px-1">
         {entries.map(e => (
           <div
             key={e.id}
             onClick={() => toggle(e.id)}
-            className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md cursor-pointer transition-all duration-100 ${
+            className={`flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-all duration-100 ${
               selected.has(e.id)
                 ? 'bg-primary/6 border border-primary/20'
                 : 'hover:bg-app-surface-elevated border border-transparent'
@@ -93,11 +93,11 @@ export default function PREntryList({ entries, onBatchReview, onDelete, disabled
               className="checkbox"
             />
             <div className="flex-1 min-w-0">
-              <p className="text-sm text-ink truncate leading-snug font-mono">
+              <p className="text-base text-ink truncate leading-snug font-mono">
                 {e.repo}#{e.pr_number}
               </p>
               {e.title && (
-                <p className="text-xs text-faint truncate leading-snug">{e.title}</p>
+                <p className="text-sm text-faint truncate leading-snug">{e.title}</p>
               )}
             </div>
             <span className={`badge ${
@@ -112,7 +112,7 @@ export default function PREntryList({ entries, onBatchReview, onDelete, disabled
                 className="icon-btn danger flex-shrink-0"
                 title="Remove"
               >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <line x1="18" y1="6" x2="6" y2="18" />
                   <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
@@ -122,31 +122,31 @@ export default function PREntryList({ entries, onBatchReview, onDelete, disabled
         ))}
       </div>
 
-      {/* Batch controls — only when items selected */}
+      {/* Batch controls */}
       {selected.size > 0 && (
-        <div className="pt-2.5 border-t border-border space-y-3 animate-fade-in">
+        <div className="pt-3 border-t border-border space-y-3 animate-fade-in">
           <div className="flex flex-wrap items-end gap-3">
-            <div className="space-y-1">
-              <p className="text-xs text-faint">Tool</p>
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium text-muted">Tool</p>
               <SegControl options={TOOLS} value={tool} onChange={setTool} disabled={disabled} />
             </div>
-            <div className="space-y-1">
-              <p className="text-xs text-faint">Depth</p>
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium text-muted">Depth</p>
               <SegControl options={DEPTHS} value={depth} onChange={setDepth} disabled={disabled} />
             </div>
-            <div className="flex-1 min-w-[140px] space-y-1">
-              <p className="text-xs text-faint">Model <span className="text-faint/60">(optional)</span></p>
+            <div className="flex-1 min-w-[160px] space-y-1.5">
+              <p className="text-sm font-medium text-muted">Model <span className="text-faint">(optional)</span></p>
               <input
                 type="text"
                 value={model}
                 onChange={e => setModel(e.target.value)}
                 placeholder="deepseek-v4-pro"
-                className="input font-mono text-xs"
+                className="input font-mono text-sm"
                 disabled={disabled}
               />
             </div>
           </div>
-          <button onClick={handleBatch} disabled={disabled} className="btn-primary btn-sm w-full">
+          <button onClick={handleBatch} disabled={disabled} className="btn-primary w-full">
             Review {selected.size} selected PR{selected.size !== 1 ? 's' : ''}
           </button>
         </div>

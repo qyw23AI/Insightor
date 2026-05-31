@@ -23,9 +23,9 @@ function shortDate(iso: string | null) {
 }
 
 function ScoreDot({ score }: { score: number | null }) {
-  if (score == null) return <span className="text-xs text-faint tabular-nums">—</span>;
+  if (score == null) return <span className="text-sm text-faint tabular-nums">—</span>;
   const cls = score >= 80 ? 'text-success' : score >= 50 ? 'text-warning' : 'text-error';
-  return <span className={`text-xs font-mono font-medium tabular-nums ${cls}`}>{score}</span>;
+  return <span className={`text-sm font-mono font-medium tabular-nums ${cls}`}>{score}</span>;
 }
 
 export default function ReviewHistoryList({ reviews, onSelect, onDelete, activeId }: Props) {
@@ -48,8 +48,8 @@ export default function ReviewHistoryList({ reviews, onSelect, onDelete, activeI
             <line x1="16" y1="13" x2="8" y2="13" />
             <line x1="16" y1="17" x2="8" y2="17" />
           </svg>
-          <p className="text-sm text-muted">No reviews yet</p>
-          <p className="text-xs text-faint mt-0.5">Start your first analysis above</p>
+          <p className="text-base text-muted">No reviews yet</p>
+          <p className="text-sm text-faint mt-0.5">Start your first analysis above</p>
         </div>
       </div>
     );
@@ -92,14 +92,14 @@ export default function ReviewHistoryList({ reviews, onSelect, onDelete, activeI
                 {/* Left: PR number + repo + meta */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-1.5 mb-0.5">
-                    <span className="text-sm font-mono font-medium text-ink leading-snug">
+                    <span className="text-base font-mono font-medium text-ink leading-snug">
                       #{r.pr_number}
                     </span>
                     {slug && (
-                      <span className="text-xs text-faint truncate leading-snug">{slug}</span>
+                      <span className="text-sm text-faint truncate leading-snug">{slug}</span>
                     )}
                   </div>
-                  <div className="flex items-center gap-1.5 text-[11px] text-faint leading-snug">
+                  <div className="flex items-center gap-1.5 text-sm text-faint leading-snug">
                     <span>{r.tool}</span>
                     <span>·</span>
                     <span>{r.depth}</span>
