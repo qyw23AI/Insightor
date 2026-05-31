@@ -20,8 +20,13 @@ function ProtectedRoute() {
   const { token, loading } = useAuth();
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-surface-950">
-        <div className="text-surface-200/40 text-lg animate-pulse">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-app-bg">
+        <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center animate-pulse-subtle">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 2C8 4.5 5.5 8.5 5.5 12C5.5 15.5 8 19.5 12 22C16 19.5 18.5 15.5 18.5 12C18.5 8.5 16 4.5 12 2Z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+        </div>
       </div>
     );
   }

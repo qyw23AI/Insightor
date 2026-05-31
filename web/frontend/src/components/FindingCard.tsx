@@ -24,21 +24,28 @@ function getSeverityBadge(severity: string) {
 
 function ConfidenceBar({ confidence }: { confidence: number }) {
   const pct = Math.round(confidence * 100);
-  const color = pct >= 80 ? 'bg-green-500' : pct >= 50 ? 'bg-yellow-500' : 'bg-red-500';
+  const color = pct >= 80 ? 'bg-success' : pct >= 50 ? 'bg-warning' : 'bg-error';
   return (
-    <div className="flex items-center gap-2 text-xs">
-      <span className="text-surface-200/50 w-16">Confidence</span>
-      <div className="flex-1 h-1.5 bg-surface-700 rounded-full overflow-hidden">
-        <div className={`h-full ${color} rounded-full`} style={{ width: `${pct}%` }} />
+    <div className="flex items-center gap-2 text-2xs">
+      <span className="text-faint w-14">Confidence</span>
+      <div className="flex-1 h-1 bg-app-surface-high rounded-full overflow-hidden">
+        <div
+          className={`h-full ${color} rounded-full transition-all duration-500 ease-out-expo`}
+          style={{ width: `${pct}%` }}
+        />
       </div>
-      <span className="text-surface-200/70 w-8 text-right">{pct}%</span>
+      <span className="text-muted w-8 text-right tabular-nums">{pct}%</span>
     </div>
   );
 }
 
 function detectLanguage(filePath: string): string {
   const ext = filePath.split('.').pop()?.toLowerCase();
-  const map: Record<string, string> = { py: 'python', ts: 'typescript', tsx: 'typescript', js: 'javascript', jsx: 'javascript', rs: 'rust', go: 'go', java: 'java', rb: 'ruby', cpp: 'cpp', c: 'c', h: 'c', css: 'css', html: 'html', json: 'json', yaml: 'yaml', yml: 'yaml', md: 'markdown', sql: 'sql' };
+  const map: Record<string, string> = {
+    py: 'python', ts: 'typescript', tsx: 'typescript', js: 'javascript', jsx: 'javascript',
+    rs: 'rust', go: 'go', java: 'java', rb: 'ruby', cpp: 'cpp', c: 'c', h: 'c',
+    css: 'css', html: 'html', json: 'json', yaml: 'yaml', yml: 'yaml', md: 'markdown', sql: 'sql',
+  };
   return map[ext || ''] || 'plaintext';
 }
 
@@ -46,25 +53,24 @@ export default function FindingCard({ finding, index, showFeedback, feedbackUI, 
   const lang = detectLanguage(finding.location.path);
 
   return (
-    <div className="card space-y-3 animate-fade-in">
+    <div className="card space-y-3 animate-fade-in" style={{ animationDelay: `${Math.min(index * 40, 400)}ms`, animationFillMode: 'backwards' }}>
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <span className="text-xs text-surface-200/40 font-mono">#{index + 1}</span>
-          <span className={getSeverityBadge(finding.severity)}>{finding.severity.toUpperCase()}</span>
-          <span className="text-xs px-2 py-0.5 rounded bg-surface-700 text-surface-200/80">{finding.category}</span>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-2xs text-faint font-mono tabular-nums">#{index + 1}</span>
+          <span className={getSeverityBadge(finding.severity)}>{finding.severity}</span>
+          <span className="text-2xs px-2 py-0.5 rounded bg-app-surface-high text-muted">{finding.category}</span>
         </div>
         <ConfidenceBar confidence={finding.confidence} />
       </div>
 
-      <h4 className="font-semibold text-white text-base">{finding.title}</h4>
-      <p className="text-sm text-surface-200/80 leading-relaxed">{finding.description}</p>
+      <h4 className="font-medium text-ink text-sm">{finding.title}</h4>
+      <p className="text-xs text-muted leading-relaxed">{finding.description}</p>
 
-      <div className="text-xs font-mono text-surface-200/40 flex items-center gap-1 flex-wrap">
-        📍{' '}
+      <div className="text-2xs font-mono text-faint flex items-center gap-1 flex-wrap">
         {onJumpToFile ? (
           <button
             onClick={() => onJumpToFile(finding.location.path)}
-            className="text-blue-400 hover:text-blue-300 underline underline-offset-2 transition-colors"
+            className="text-accent hover:text-accent-hover underline underline-offset-2 transition-colors"
             title="Jump to file in Diff view"
           >
             {finding.location.path}:{finding.location.range.start.line}
@@ -75,10 +81,10 @@ export default function FindingCard({ finding, index, showFeedback, feedbackUI, 
       </div>
 
       {finding.suggestion?.current_code && (
-        <CodeBlock code={finding.suggestion.current_code} label="❌ Current Code" language={lang} />
+        <CodeBlock code={finding.suggestion.current_code} label="Current code" language={lang} />
       )}
       {finding.suggestion?.suggested_code && (
-        <CodeBlock code={finding.suggestion.suggested_code} label="✅ Suggested Fix" language={lang} />
+        <CodeBlock code={finding.suggestion.suggested_code} label="Suggested fix" language={lang} />
       )}
 
       {showFeedback && feedbackUI}

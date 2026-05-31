@@ -11,15 +11,15 @@ interface Props {
 }
 
 const TOOLS = [
-  { value: 'review', label: '🔍 Review' },
-  { value: 'describe', label: '📝 Describe' },
-  { value: 'risks', label: '⚠️ Risks' },
+  { value: 'review', label: 'Review' },
+  { value: 'describe', label: 'Describe' },
+  { value: 'risks', label: 'Risks' },
 ];
 
 const DEPTHS = [
-  { value: 'quick', label: '⚡ Quick' },
-  { value: 'standard', label: '📐 Standard' },
-  { value: 'deep', label: '🔬 Deep' },
+  { value: 'quick', label: 'Quick' },
+  { value: 'standard', label: 'Standard' },
+  { value: 'deep', label: 'Deep' },
 ];
 
 export default function PREntryList({ entries, onBatchReview, onDelete, disabled }: Props) {
@@ -54,41 +54,47 @@ export default function PREntryList({ entries, onBatchReview, onDelete, disabled
   return (
     <div className="card space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-white">Recent PRs ({entries.length})</h3>
-        <div className="flex gap-2">
-          <button onClick={toggleAll} className="btn-ghost text-xs">
-            {selected.size === entries.length ? 'Deselect All' : 'Select All'}
-          </button>
-        </div>
+        <h3 className="text-sm font-semibold text-ink">Recent PRs ({entries.length})</h3>
+        <button onClick={toggleAll} className="btn-ghost btn-sm text-xs">
+          {selected.size === entries.length ? 'Deselect all' : 'Select all'}
+        </button>
       </div>
 
       <div className="space-y-1 max-h-48 overflow-y-auto">
         {entries.map(e => (
           <div
             key={e.id}
-            className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
-              selected.has(e.id) ? 'bg-blue-600/10 border border-blue-500/30' : 'hover:bg-surface-700/50'
+            className={`flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-all duration-150 ${
+              selected.has(e.id)
+                ? 'bg-primary/6 border border-primary/20'
+                : 'hover:bg-app-surface-elevated border border-transparent'
             }`}
           >
             <input
               type="checkbox"
               checked={selected.has(e.id)}
               onChange={() => toggle(e.id)}
-              className="w-4 h-4 rounded accent-blue-500"
+              className="checkbox"
             />
             <div className="flex-1 min-w-0">
-              <p className="text-sm text-white truncate">{e.repo}#{e.pr_number}</p>
-              <p className="text-xs text-surface-200/50 truncate">{e.pr_url}</p>
+              <p className="text-sm text-ink truncate">{e.repo}#{e.pr_number}</p>
+              <p className="text-2xs text-faint truncate font-mono">{e.pr_url}</p>
             </div>
-            <span className={`text-xs px-2 py-0.5 rounded ${
-              e.status === 'done' ? 'bg-green-500/20 text-green-400' :
-              e.status === 'running' ? 'bg-yellow-500/20 text-yellow-400' :
-              'bg-surface-700 text-surface-200/50'
+            <span className={`badge text-2xs ${
+              e.status === 'done' ? 'badge-success' :
+              e.status === 'running' ? 'badge-info' :
+              'badge-low'
             }`}>
               {e.status}
             </span>
             {onDelete && (
-              <button onClick={() => onDelete(e.id)} className="text-xs text-red-400/50 hover:text-red-400">✕</button>
+              <button
+                onClick={() => onDelete(e.id)}
+                className="text-faint hover:text-error transition-colors p-1"
+                title="Delete entry"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              </button>
             )}
           </div>
         ))}
@@ -96,25 +102,25 @@ export default function PREntryList({ entries, onBatchReview, onDelete, disabled
 
       {/* Batch review controls */}
       {selected.size > 0 && (
-        <div className="pt-3 border-t border-surface-700 space-y-3">
+        <div className="pt-3 border-t border-border space-y-3">
           <div className="flex flex-wrap gap-3">
             <div className="flex-1 min-w-[120px]">
-              <label className="block text-xs font-medium text-surface-200/50 mb-1">Tool</label>
+              <label className="block text-xs font-medium text-muted mb-1">Tool</label>
               <select value={tool} onChange={e => setTool(e.target.value)} className="input text-sm" disabled={disabled}>
                 {TOOLS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
             </div>
             <div className="flex-1 min-w-[120px]">
-              <label className="block text-xs font-medium text-surface-200/50 mb-1">Depth</label>
+              <label className="block text-xs font-medium text-muted mb-1">Depth</label>
               <select value={depth} onChange={e => setDepth(e.target.value)} className="input text-sm" disabled={disabled}>
                 {DEPTHS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
               </select>
             </div>
             <div className="flex-1 min-w-[150px]">
-              <label className="block text-xs font-medium text-surface-200/50 mb-1">Model (optional)</label>
+              <label className="block text-xs font-medium text-muted mb-1">Model (optional)</label>
               <input
                 type="text" value={model} onChange={e => setModel(e.target.value)}
-                placeholder="deepseek-v4-pro" className="input text-sm" disabled={disabled}
+                placeholder="deepseek-v4-pro" className="input text-sm font-mono" disabled={disabled}
               />
             </div>
           </div>
@@ -123,7 +129,7 @@ export default function PREntryList({ entries, onBatchReview, onDelete, disabled
             disabled={disabled}
             className="btn-primary w-full text-sm"
           >
-            ⚡ Review Selected ({selected.size})
+            Review selected ({selected.size})
           </button>
         </div>
       )}

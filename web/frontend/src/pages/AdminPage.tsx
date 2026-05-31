@@ -28,50 +28,71 @@ export default function AdminPage() {
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Admin Panel</h1>
-        <p className="text-sm text-surface-200/60">User management</p>
+        <h1 className="text-lg font-semibold text-ink tracking-tight">Admin panel</h1>
+        <p className="text-sm text-muted mt-0.5">User management</p>
       </div>
 
-      <div className="card">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-surface-700">
-                <th className="text-left py-3 px-4 text-surface-200/50 font-medium">Username</th>
-                <th className="text-left py-3 px-4 text-surface-200/50 font-medium">Role</th>
-                <th className="text-left py-3 px-4 text-surface-200/50 font-medium">Created</th>
-                <th className="text-left py-3 px-4 text-surface-200/50 font-medium">Last Login</th>
-                <th className="text-right py-3 px-4 text-surface-200/50 font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map(u => (
-                <tr key={u.id} className="border-b border-surface-700/50 hover:bg-surface-700/30">
-                  <td className="py-3 px-4 text-white font-medium">{u.username}</td>
-                  <td className="py-3 px-4">
-                    <span className={`text-xs px-2 py-0.5 rounded ${u.is_admin ? 'bg-purple-500/20 text-purple-400' : 'bg-surface-700 text-surface-200/70'}`}>
-                      {u.is_admin ? 'Admin' : 'User'}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-surface-200/60">
-                    {u.created_at ? new Date(u.created_at).toLocaleDateString() : '-'}
-                  </td>
-                  <td className="py-3 px-4 text-surface-200/60">
-                    {u.last_login ? new Date(u.last_login).toLocaleDateString() : 'Never'}
-                  </td>
-                  <td className="py-3 px-4 text-right">
-                    {!u.is_admin && (
-                      <button onClick={() => handleDelete(u.id)} className="btn-danger text-xs py-1 px-3">
-                        Delete
-                      </button>
-                    )}
-                  </td>
+      <div className="card !p-0 overflow-hidden">
+        {loading ? (
+          <div className="p-8 space-y-3">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="flex gap-4 px-4">
+                <div className="skeleton h-10 flex-1" />
+                <div className="skeleton h-10 w-16" />
+                <div className="skeleton h-10 w-24" />
+                <div className="skeleton h-10 w-24" />
+                <div className="skeleton h-10 w-16" />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left py-3 px-4 text-faint font-medium text-2xs">Username</th>
+                  <th className="text-left py-3 px-4 text-faint font-medium text-2xs">Role</th>
+                  <th className="text-left py-3 px-4 text-faint font-medium text-2xs">Created</th>
+                  <th className="text-left py-3 px-4 text-faint font-medium text-2xs">Last login</th>
+                  <th className="text-right py-3 px-4 text-faint font-medium text-2xs">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {loading && <p className="text-center py-8 text-surface-200/40">Loading...</p>}
+              </thead>
+              <tbody>
+                {users.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="text-center py-16 text-muted">
+                      <p className="text-sm">No users found</p>
+                    </td>
+                  </tr>
+                ) : (
+                  users.map(u => (
+                    <tr key={u.id} className="border-b border-border hover:bg-app-surface transition-colors">
+                      <td className="py-3 px-4 text-ink font-medium">{u.username}</td>
+                      <td className="py-3 px-4">
+                        <span className={`badge ${u.is_admin ? 'badge-info' : 'badge-low'}`}>
+                          {u.is_admin ? 'Admin' : 'User'}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-muted tabular-nums text-xs">
+                        {u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}
+                      </td>
+                      <td className="py-3 px-4 text-muted text-xs">
+                        {u.last_login ? new Date(u.last_login).toLocaleDateString() : 'Never'}
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        {!u.is_admin && (
+                          <button onClick={() => handleDelete(u.id)} className="btn-danger btn-sm">
+                            Delete
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,13 +1,13 @@
-/* Feedback interaction for a single finding — status buttons + optional note */
+/* Feedback interaction for a single finding */
 
 import { useState } from 'react';
 import type { Finding, FeedbackItem } from '../types/urf';
 
 const STATUSES = [
-  { value: 'confirmed', label: '✅ Confirmed', color: 'text-green-400' },
-  { value: 'false_positive', label: '❌ False Positive', color: 'text-red-400' },
-  { value: 'addressed', label: '🔧 Addressed', color: 'text-blue-400' },
-  { value: 'ignored', label: '⏭️ Ignored', color: 'text-gray-400' },
+  { value: 'confirmed', label: 'Confirmed', activeClass: 'text-success border-success/30 bg-success/8' },
+  { value: 'false_positive', label: 'False positive', activeClass: 'text-error border-error/30 bg-error/8' },
+  { value: 'addressed', label: 'Addressed', activeClass: 'text-accent border-accent/30 bg-accent/8' },
+  { value: 'ignored', label: 'Ignored', activeClass: 'text-muted border-border-hover bg-app-surface-elevated' },
 ];
 
 interface Props {
@@ -32,17 +32,18 @@ export default function FeedbackPanel({ finding, onChange, initial }: Props) {
   };
 
   return (
-    <div className="space-y-3 pt-3 border-t border-surface-700/50">
+    <div className="space-y-3 pt-3 border-t border-border">
+      <p className="text-2xs text-faint font-medium">Mark this finding</p>
       <div className="flex flex-wrap gap-1.5">
         {STATUSES.map(s => (
           <button
             key={s.value}
             type="button"
             onClick={() => handleStatus(s.value)}
-            className={`px-3 py-1 rounded-full text-xs font-medium transition-all border ${
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 border active:scale-95 ${
               status === s.value
-                ? `${s.color} border-current bg-surface-700/50`
-                : 'text-surface-200/50 border-surface-700 hover:border-surface-200/30'
+                ? s.activeClass
+                : 'text-muted border-border hover:border-border-hover hover:text-ink'
             }`}
           >
             {s.label}

@@ -19,7 +19,6 @@ export default function DashboardPage() {
   const [reviews, setReviews] = useState<ReviewSummary[]>([]);
   const [selectedReview, setSelectedReview] = useState<ReviewSummary | null>(null);
 
-  // Running jobs + SSE live in ReviewContext — survives page navigation
   const { jobs, overallProgress, overallDone, isRunning, runningJobs, startJobs, clearJobs } = useReview();
 
   const loadData = useCallback(async () => {
@@ -31,20 +30,14 @@ export default function DashboardPage() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // When all jobs complete, refresh data and clear running jobs after a delay
   useEffect(() => {
     if (overallDone && runningJobs.length > 0) {
-      // SSE "done" is now published AFTER DB commit, so data is ready immediately.
       loadData();
-      // Keep the progress visible for a moment, then clear
-      const timer = setTimeout(() => {
-        clearJobs();
-      }, 8000);
+      const timer = setTimeout(() => { clearJobs(); }, 8000);
       return () => clearTimeout(timer);
     }
   }, [overallDone, runningJobs.length]);
 
-  // Import PRs only — save entries, no analysis
   const handleImport = async (urls: string[]) => {
     if (!token) return;
     try {
@@ -55,7 +48,6 @@ export default function DashboardPage() {
     }
   };
 
-  // Quick shortcut: import + analyze immediately
   const handleAnalyze = async (urls: string[], tool: string, depth: string, model?: string) => {
     if (!token) return;
     try {
@@ -77,7 +69,6 @@ export default function DashboardPage() {
     }
   };
 
-  // Batch review: start analysis on already-imported PRs
   const handleBatchReview = async (urls: string[], tool: string, depth: string, model?: string) => {
     if (!token || urls.length === 0) return;
     try {
@@ -120,22 +111,21 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
+    <div className="p-6 max-w-4xl mx-auto space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-          <p className="text-sm text-surface-200/60">PR Review Console</p>
+          <h1 className="text-lg font-semibold text-ink tracking-tight">Dashboard</h1>
+          <p className="text-sm text-muted mt-0.5">PR review console</p>
         </div>
         {reviews.length > 0 && (
-          <div className="text-sm text-surface-200/40">
-            {reviews.filter(r => r.published).length} published · {reviews.filter(r => !r.published && r.status === 'done').length} drafts
+          <div className="text-xs text-faint tabular-nums">
+            {reviews.filter(r => r.published).length} published &middot; {reviews.filter(r => !r.published && r.status === 'done').length} drafts
           </div>
         )}
       </div>
 
       <PRInput onSubmit={handleAnalyze} onImport={handleImport} disabled={isRunning} />
 
-      {/* Rich multi-job progress display */}
       {runningJobs.length > 0 && (
         <ProgressOverlay
           jobs={jobs}
