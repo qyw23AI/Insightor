@@ -112,7 +112,7 @@ export default function DiffViewer({ diffText, scrollToFile, onScrollDone }: Pro
   return (
     <div className="space-y-1.5">
       {/* Summary bar */}
-      <div className="flex items-center gap-3 text-2xs text-faint mb-3 px-1">
+      <div className="flex items-center gap-3 text-xs text-faint mb-3 px-1">
         <span>{files.length} file{files.length > 1 ? 's' : ''}</span>
         <span className="text-success tabular-nums">+{totalAdds}</span>
         <span className="text-error tabular-nums">-{totalDels}</span>
@@ -151,9 +151,9 @@ export default function DiffViewer({ diffText, scrollToFile, onScrollDone }: Pro
               >
                 <polyline points="9 18 15 12 9 6" />
               </svg>
-              <code className="text-xs text-ink flex-1 truncate">{file.filename}</code>
-              <span className="text-2xs text-success font-mono tabular-nums">+{file.additions}</span>
-              <span className="text-2xs text-error font-mono tabular-nums">-{file.deletions}</span>
+              <code className="text-sm text-ink flex-1 truncate">{file.filename}</code>
+              <span className="text-xs text-success font-mono tabular-nums">+{file.additions}</span>
+              <span className="text-xs text-error font-mono tabular-nums">-{file.deletions}</span>
             </button>
 
             {/* File content */}

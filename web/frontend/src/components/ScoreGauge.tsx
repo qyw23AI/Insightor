@@ -24,12 +24,12 @@ export default function ScoreGauge({ score, recommendation }: Props) {
           />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-sm font-semibold text-ink tabular-nums">{score}</span>
+          <span className="text-base font-semibold text-ink tabular-nums">{score}</span>
         </div>
       </div>
       <div>
-        <p className="text-xs font-medium text-ink capitalize">{recommendation.replace(/_/g, ' ')}</p>
-        <p className="text-2xs text-muted">Merge readiness</p>
+        <p className="text-sm font-medium text-ink capitalize">{recommendation.replace(/_/g, ' ')}</p>
+        <p className="text-xs text-muted">Merge readiness</p>
       </div>
     </div>
   );

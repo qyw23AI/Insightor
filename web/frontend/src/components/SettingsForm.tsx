@@ -58,11 +58,11 @@ export default function SettingsForm() {
     <div className="space-y-8">
       {/* API Keys */}
       <div className="card space-y-4">
-        <h2 className="text-sm font-semibold text-ink">API keys & tokens</h2>
-        <p className="text-xs text-muted">Your credentials are encrypted before storage.</p>
+        <h2 className="text-base font-semibold text-ink">API keys & tokens</h2>
+        <p className="text-sm text-muted">Your credentials are encrypted before storage.</p>
         {CONFIG_FIELDS.map(field => (
           <div key={field.key}>
-            <label className="block text-xs font-medium text-muted mb-1.5">{field.label}</label>
+            <label className="block text-sm font-medium text-muted mb-1.5">{field.label}</label>
             <div className="relative">
               <input
                 type="password"
@@ -72,7 +72,7 @@ export default function SettingsForm() {
                 className="input font-mono text-sm"
               />
               {masked[field.key] && !configs[field.key] && (
-                <p className="text-2xs text-faint mt-1">Current: {masked[field.key]}</p>
+                <p className="text-xs text-faint mt-1">Current: {masked[field.key]}</p>
               )}
             </div>
           </div>
@@ -81,10 +81,10 @@ export default function SettingsForm() {
 
       {/* Model config */}
       <div className="card space-y-4">
-        <h2 className="text-sm font-semibold text-ink">Model configuration</h2>
+        <h2 className="text-base font-semibold text-ink">Model configuration</h2>
         {MODEL_FIELDS.map(field => (
           <div key={field.key}>
-            <label className="block text-xs font-medium text-muted mb-1.5">{field.label}</label>
+            <label className="block text-sm font-medium text-muted mb-1.5">{field.label}</label>
             <input
               type="text"
               placeholder={field.placeholder}
@@ -101,7 +101,7 @@ export default function SettingsForm() {
           {saving ? 'Saving...' : 'Save configuration'}
         </button>
         {message && (
-          <span className={`text-xs ${message.startsWith('Error') ? 'text-error' : 'text-success'}`}>
+          <span className={`text-sm ${message.startsWith('Error') ? 'text-error' : 'text-success'}`}>
             {message}
           </span>
         )}

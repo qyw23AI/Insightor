@@ -28,8 +28,8 @@ export default function AdminPage() {
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div>
-        <h1 className="text-lg font-semibold text-ink tracking-tight">Admin panel</h1>
-        <p className="text-sm text-muted mt-0.5">User management</p>
+        <h1 className="text-xl font-semibold text-ink tracking-tight">Admin panel</h1>
+        <p className="text-base text-muted mt-0.5">User management</p>
       </div>
 
       <div className="card !p-0 overflow-hidden">
@@ -47,21 +47,21 @@ export default function AdminPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-base">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="text-left py-3 px-4 text-faint font-medium text-2xs">Username</th>
-                  <th className="text-left py-3 px-4 text-faint font-medium text-2xs">Role</th>
-                  <th className="text-left py-3 px-4 text-faint font-medium text-2xs">Created</th>
-                  <th className="text-left py-3 px-4 text-faint font-medium text-2xs">Last login</th>
-                  <th className="text-right py-3 px-4 text-faint font-medium text-2xs">Actions</th>
+                  <th className="text-left py-3 px-4 text-faint font-medium text-xs">Username</th>
+                  <th className="text-left py-3 px-4 text-faint font-medium text-xs">Role</th>
+                  <th className="text-left py-3 px-4 text-faint font-medium text-xs">Created</th>
+                  <th className="text-left py-3 px-4 text-faint font-medium text-xs">Last login</th>
+                  <th className="text-right py-3 px-4 text-faint font-medium text-xs">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {users.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="text-center py-16 text-muted">
-                      <p className="text-sm">No users found</p>
+                      <p className="text-base">No users found</p>
                     </td>
                   </tr>
                 ) : (
@@ -73,10 +73,10 @@ export default function AdminPage() {
                           {u.is_admin ? 'Admin' : 'User'}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-muted tabular-nums text-xs">
+                      <td className="py-3 px-4 text-muted tabular-nums text-sm">
                         {u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}
                       </td>
-                      <td className="py-3 px-4 text-muted text-xs">
+                      <td className="py-3 px-4 text-muted text-sm">
                         {u.last_login ? new Date(u.last_login).toLocaleDateString() : 'Never'}
                       </td>
                       <td className="py-3 px-4 text-right">

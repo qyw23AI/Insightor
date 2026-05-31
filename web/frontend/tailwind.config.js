@@ -36,7 +36,7 @@ export default {
         mono: ['"Geist Mono"', '"JetBrains Mono"', '"Fira Code"', 'monospace'],
       },
       fontSize: {
-        '2xs': ['0.6875rem', { lineHeight: '1.25rem' }],
+        '2xs': ['0.75rem', { lineHeight: '1.375rem' }],
       },
       transitionTimingFunction: {
         'ease-out-expo': 'cubic-bezier(0.16, 1, 0.3, 1)',

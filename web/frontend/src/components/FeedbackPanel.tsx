@@ -33,14 +33,14 @@ export default function FeedbackPanel({ finding, onChange, initial }: Props) {
 
   return (
     <div className="space-y-3 pt-3 border-t border-border">
-      <p className="text-2xs text-faint font-medium">Mark this finding</p>
+      <p className="text-xs text-faint font-medium">Mark this finding</p>
       <div className="flex flex-wrap gap-1.5">
         {STATUSES.map(s => (
           <button
             key={s.value}
             type="button"
             onClick={() => handleStatus(s.value)}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 border active:scale-95 ${
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-150 border active:scale-95 ${
               status === s.value
                 ? s.activeClass
                 : 'text-muted border-border hover:border-border-hover hover:text-ink'

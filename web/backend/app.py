@@ -71,7 +71,19 @@ def create_app() -> FastAPI:
     # Production static file serving (when React is built)
     dist_dir = Path(__file__).resolve().parent.parent / "frontend" / "dist"
     if dist_dir.exists() and (dist_dir / "index.html").exists():
-        app.mount("/", StaticFiles(directory=str(dist_dir), html=True), name="static")
+        # Mount /assets first — serves JS, CSS, and other static assets
+        assets_dir = dist_dir / "assets"
+        if assets_dir.exists():
+            app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+
+        # SPA catch-all: serve index.html for any unmatched GET request.
+        # This MUST come after all API routes and the /assets mount so that
+        # API calls and static assets are not swallowed.
+        # IMPORTANT: Register any new API routes BEFORE this point.
+        @app.get("/{full_path:path}")
+        async def serve_spa(full_path: str):
+            from fastapi.responses import FileResponse
+            return FileResponse(dist_dir / "index.html")
 
     return app
 
