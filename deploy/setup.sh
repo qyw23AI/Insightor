@@ -119,7 +119,11 @@ chown -R "$APP_USER:$APP_USER" "$APP_DIR"
 
 systemctl daemon-reload
 systemctl enable insightor-api
-systemctl start insightor-api
+if systemctl is-active --quiet insightor-api; then
+    systemctl restart insightor-api
+else
+    systemctl start insightor-api
+fi
 
 # ---------- 检查状态 ----------
 echo ""
