@@ -1,246 +1,273 @@
-# Insightor VSCode Extension
+# Insightor
 
 <div align="center">
 
 ![Insightor Logo](resources/icon.png)
 
-**AI-powered GitHub PR review assistant for Visual Studio Code**
+**AI 驱动的 GitHub PR 审查助手 **
 
 [![VSCode](https://img.shields.io/badge/VSCode-1.85+-blue.svg)](https://code.visualstudio.com/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)](https://www.typescriptlang.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-[Quick Start](#-quick-start-3-steps) • [Features](#-features) • [Installation](#-installation) • [Usage](#-usage) • [Configuration](#-configuration)
+[快速开始](#-快速开始三步搞定) • [功能特性](#-功能特性) • [安装指南](#-详细安装) • [使用方法](#-使用方法) • [配置说明](#️-配置说明)
 
 </div>
 
 ---
 
-## 🚀 Quick Start (3 Steps)
-
-### Step 1: Install Insightor CLI
-
-```bash
-pip install git+https://github.com/SCU-GuGuGaGa/Insightor.git
-```
-
-### Step 2: Configure API Key
-
-Create `.env` file in your project root:
-
-```bash
-# Choose one:
-OPENAI_API_KEY=sk-xxx
-# or
-DEEPSEEK_API_KEY=sk-xxx
-# or
-ANTHROPIC_API_KEY=sk-xxx
-```
-
-### Step 3: Install Extension & Use
-
-1. Install `insightor-vscode-0.1.0.vsix` in VSCode
-2. Press `Ctrl+Shift+P` → Type `Insightor: Full Review`
-3. Enter PR URL: `https://github.com/owner/repo/pull/123`
-4. View results in sidebar! 🎉
+## 🚀 快速开始
+待补充：快速开始内容
+<!-- 待补充：快速开始内容 -->
 
 ---
 
-## 🎯 Overview
+## 🎯 产品概述
 
-Insightor VSCode Extension brings the power of AI-driven code review directly into your editor. Analyze GitHub Pull Requests, identify risks, generate descriptions, and publish reviews—all without leaving VSCode.
+Insightor将 AI 驱动的代码审查能力直接集成到网页或是您的vscode编辑器中。分析 GitHub Pull Request、识别风险、生成描述、发布审查——全部自动化。
 
-### Why Insightor?
+### Insightor 提供三种使用方式
 
-- 🤖 **AI-Powered Analysis** - Leverages LLMs (OpenAI, DeepSeek, Claude) for intelligent code review
-- 🔍 **Multi-Dimensional Review** - Code quality, security risks, performance issues, and more
-- 🌳 **Visual Tree View** - Browse findings organized by severity in the sidebar
-- 💡 **Quick Fixes** - Apply suggested code changes with one click
-- 📊 **Merge Readiness Score** - Get a confidence score for PR approval
-- 🚀 **Human-in-the-Loop** - Review and confirm AI findings before publishing
 
-## ✨ Features
+- **Web 控制台** — 可视化界面，支持多用户、实时进度、Diff 审查
+- **VSCode 扩展**（本扩展）— IDE 内审查，侧边栏展示结果，一键应用建议
+- **CLI 工具** — 命令行一键审查，生成 Markdown 报告
 
-### Core Commands
 
-| Command | Description | Shortcut |
-|---------|-------------|----------|
-| **Full Review** | Complete analysis (describe + risks + review) | - |
-| **Review PR** | Detailed code review with suggestions | - |
-| **Describe PR** | Generate PR description and file walkthrough | - |
-| **Analyze Risks** | Identify security, performance, concurrency risks | - |
-| **Publish Review** | Post human-confirmed reviews to GitHub | - |
+### 为什么选择 Insightor？
 
-### Sidebar View
+- **AI 智能分析** — 利用大语言模型（OpenAI、DeepSeek、Claude）进行智能代码审查
+- **多维度审查** — 代码质量、安全风险、性能问题等全方位分析
+- **可视化树状视图** — 侧边栏按严重程度组织发现，一目了然
+- **快速修复** — 一键应用 AI 建议的代码修改
+- **合并就绪评分** — 0-100 分置信度评分，辅助决策
+- **人机协同** — 审查并确认 AI 发现后再发布
 
-- **Findings by Severity**: Critical, High, Medium, Low, Info
-- **Merge Readiness Score**: 0-100 confidence rating
-- **File Walkthrough**: See all changed files with summaries
-- **Click to Navigate**: Jump directly to code locations
-- **Apply Fixes**: One-click code suggestions
 
-### Analysis Depths
+## ✨ 功能特性
 
-| Depth | Time | Tokens | Use Case |
-|-------|------|--------|----------|
-| **Quick** | ~15s | ~3K | Small PRs, quick checks |
-| **Standard** | ~30s | ~8K | Most PRs (default) |
-| **Deep** | ~60s | ~16K | Critical changes, complex logic |
+### 核心命令
 
-## 📦 Detailed Installation
+| 命令 | 功能说明 | 快捷键 |
+|------|----------|--------|
+| **Full Review** | 完整分析（总结 + 风险 + 审查） | - |
+| **Review PR** | 详细代码审查和建议 | - |
+| **Describe PR** | 生成 PR 描述和文件走览 | - |
+| **Analyze Risks** | 识别安全、性能、并发风险 | - |
+| **Publish Review** | 发布人工确认的审查到 GitHub | - |
 
-### Prerequisites
+### 侧边栏视图
 
-✅ **Python 3.11+** with Insightor CLI installed  
-✅ **LLM API Key** (OpenAI, DeepSeek, or Claude)  
-✅ **VSCode 1.85+**
+- **按严重程度分类** — Critical、High、Medium、Low、Info
+- **合并就绪评分** — 0-100 分置信度评分
+- **文件走览** — 查看所有变更文件及摘要
+- **点击跳转** — 直接跳转到代码位置
+- **应用修复** — 一键应用代码建议
 
-### Install Insightor CLI
+### 分析深度
 
-**Option A: From PyPI (Recommended)**
+| 深度 | 耗时 | Token | 适用场景 |
+|------|------|-------|----------|
+| **Quick** | ~15s | ~3K | 小型 PR，快速检查 |
+| **Standard** | ~30s | ~8K | 大多数 PR（默认） |
+| **Deep** | ~60s | ~16K | 关键变更，复杂逻辑 |
+
+## 📦 详细安装
+
+
+
+### 方式一：安装 Insightor CLI
+
+**方式 A：从 PyPI 安装（推荐）**
 ```bash
 pip install git+https://github.com/SCU-GuGuGaGa/Insightor.git
 ```
 
-**Option B: From Source**
+**方式 B：从源码安装**
 ```bash
 git clone https://github.com/SCU-GuGuGaGa/Insightor.git
 cd Insightor
 pip install -e .
 ```
 
-**Verify Installation:**
+**验证安装：**
 ```bash
 python -m insightor --version
-# Should output: insightor 0.1.0
+# 应输出：insightor 0.1.0
 ```
 
-### Configure API Key
+### 配置 API Key
 
-Create `.env` file in your **project root** (where you'll review PRs):
+在**项目根目录**创建 `.env` 文件（审查 PR 的项目目录）：
 
 ```bash
-# Choose ONE provider:
+# 选择一个提供商：
 OPENAI_API_KEY=sk-proj-xxxxx           # OpenAI GPT-4
-DEEPSEEK_API_KEY=sk-xxxxx              # DeepSeek (cheaper)
+DEEPSEEK_API_KEY=sk-xxxxx              # DeepSeek（更便宜）
 ANTHROPIC_API_KEY=sk-ant-xxxxx         # Claude
 ```
 
-💡 **Tip**: You can also set environment variables globally or use `.insightor.yml` for per-project config.
+💡 **提示**：也可以全局设置环境变量，或使用 `.insightor.yml` 进行项目级配置。
 
-### Install VSCode Extension
+### 方式二：安装 VSCode 扩展
 
-**Option A: From VSIX (Recommended)**
+**方式 A：从 VSIX 安装（推荐）**
 
-1. Download `insightor-vscode-0.1.0.vsix`
-2. Open VSCode → Extensions (`Ctrl+Shift+X`)
-3. Click `...` menu → `Install from VSIX...`
-4. Select the downloaded file
+1. 下载 `insightor-vscode-0.1.1.vsix`
+2. 打开 VSCode → 扩展（`Ctrl+Shift+X`）
+3. 点击 `...` 菜单 → `从 VSIX 安装...`
+4. 选择下载的文件
 
-**Option B: From Source (Developers)**
+**方式 B：从VSCode扩展市场安装**  
+1. 打开 VSCode → 扩展（`Ctrl+Shift+X`）
+2. 搜索 Insightor，选择并下载
+
+
+
+## 🚀 使用方法
+
+### Web 控制台使用
+
+如果你需要团队协作、多用户管理或可视化界面，推荐使用 Web 控制台：
+
+**安装和启动：**
 
 ```bash
-cd vscode-extension
-npm install
-npm run compile
-# Press F5 to launch Extension Development Host
+# 1. 安装依赖
+pip install -e ".[web]"
+cd web/frontend && npm install && npm run build && cd ../..
+
+# 2. 启动服务
+uvicorn web.backend.app:app --host 0.0.0.0 --port 8000
+
+# 3. 浏览器访问
+# http://localhost:8000
+# 默认账户: admin / admin123
 ```
 
-## 🚀 How to Use
+**使用流程：**
 
-### Basic Usage
+1. **登录** — 使用管理员账户或注册新用户
+2. **配置** — 在配置页面填入 GitHub Token 和 LLM API Key（每个用户独立配置）
+3. **添加 PR** — 输入 PR URL，支持批量添加
+4. **发起分析** — 选择分析深度，实时查看 SSE 推送的进度
+5. **查看结果** — 分文件审查 Diff，支持语法高亮，导出或发布到 GitHub
 
-**1️⃣ Open Command Palette**
-- Press `Ctrl+Shift+P` (Windows/Linux) or `Cmd+Shift+P` (Mac)
+**Web 控制台特性：**
 
-**2️⃣ Choose a Command**
-- `Insightor: Full Review` - Complete analysis (recommended for first use)
-- `Insightor: Review PR` - Code review only
-- `Insightor: Describe PR` - Generate PR description
-- `Insightor: Analyze Risks` - Security & performance risks
-- `Insightor: Publish Review` - Post results to GitHub
+- **多用户系统** — 每个用户独立配置 API Key，加密存储
+- **实时进度** — SSE 推送分析进度，无需刷新页面
+- **可视化 Diff** — 分文件展示代码变更，支持语法高亮
+- **结果持久化** — 审查结果存储在数据库，支持导出 JSON
+- **PR 管理** — 查看历史审查记录，批量管理 PR
 
-**3️⃣ Enter PR URL**
+详细文档：[Web 控制台文档](../web/README.md)
+
+### VSCode 扩展使用
+
+**1️⃣ 打开命令面板**
+- 按 `Ctrl+Shift+P`（Windows/Linux）或 `Cmd+Shift+P`（Mac）
+
+**2️⃣ 选择命令**
+- `Insightor: Full Review` - 完整分析（首次使用推荐）
+- `Insightor: Review PR` - 仅代码审查
+- `Insightor: Describe PR` - 生成 PR 描述
+- `Insightor: Analyze Risks` - 安全和性能风险
+- `Insightor: Publish Review` - 发布结果到 GitHub
+
+**3️⃣ 输入 PR URL**
 ```
 https://github.com/owner/repo/pull/123
 ```
 
-**4️⃣ Select Analysis Depth**
-- `quick` - 15 seconds, small PRs
-- `standard` - 30 seconds, most PRs (default)
-- `deep` - 60 seconds, critical changes
+**4️⃣ 选择分析深度**
+- `quick` - 15 秒，小型 PR
+- `standard` - 30 秒，大多数 PR（默认）
+- `deep` - 60 秒，关键变更
 
-**5️⃣ View Results**
-- **Sidebar**: Click Insightor icon in Activity Bar (left side)
-- **Markdown**: Auto-opens in editor with full report
-- **Click findings**: Jump directly to code locations
+**5️⃣ 查看结果**
+- **侧边栏**：点击活动栏（左侧）的 Insightor 图标
+- **Markdown**：自动在编辑器中打开完整报告
+- **点击发现**：直接跳转到代码位置
 
-### Workflow Example
+### CLI 工具使用
+
+如果你更喜欢命令行，也可以直接使用 CLI：
+
+```bash
+# 一键完整审查
+insightor full https://github.com/owner/repo/pull/123
+
+# 生成 Markdown 报告后编辑并发布
+insightor publish insightor-full-review-123.md
+```
+
+### 工作流示例（VSCode 扩展）
 
 ```
 ┌─────────────────────────────────────┐
-│ 1. Run Full Review                  │
-│    Input: PR URL                    │
-│    Depth: standard                  │
+│ 1. 运行完整审查                      │
+│    输入：PR URL                      │
+│    深度：standard                    │
 └──────────────┬──────────────────────┘
                │
                ▼
 ┌─────────────────────────────────────┐
-│ 2. AI Analysis                      │
-│    - Describe PR                    │
-│    - Identify Risks                 │
-│    - Review Code                    │
+│ 2. AI 分析                          │
+│    - 描述 PR                        │
+│    - 识别风险                        │
+│    - 审查代码                        │
 └──────────────┬──────────────────────┘
                │
                ▼
 ┌─────────────────────────────────────┐
-│ 3. Review Results                   │
-│    - Sidebar tree view              │
-│    - Markdown report                │
-│    - Click findings → jump to code  │
+│ 3. 查看结果                          │
+│    - 侧边栏树状视图                  │
+│    - Markdown 报告                   │
+│    - 点击发现 → 跳转到代码           │
 └──────────────┬──────────────────────┘
                │
                ▼
 ┌─────────────────────────────────────┐
-│ 4. Human Review                     │
-│    - Edit markdown                  │
-│    - Check/uncheck findings         │
-│    - Add comments                   │
+│ 4. 人工审查                          │
+│    - 编辑 Markdown                   │
+│    - 勾选/取消勾选发现               │
+│    - 添加评论                        │
 └──────────────┬──────────────────────┘
                │
                ▼
 ┌─────────────────────────────────────┐
-│ 5. Publish to GitHub                │
-│    Command: Publish Review          │
-│    Option: Dry-run or Live          │
+│ 5. 发布到 GitHub                     │
+│    命令：Publish Review              │
+│    选项：预览或正式发布              │
 └─────────────────────────────────────┘
 ```
 
-### Sidebar Navigation
+### 侧边栏导航
 
 ```
 Insightor
-├── 📋 PR Summary
-│   └── Overview text
-├── ✅ Score: 85/100
+├── 📋 PR 总结
+│   └── 概述文本
+├── ✅ 评分：85/100
 ├── 🔴 CRITICAL (2)
-│   ├── SQL Injection vulnerability
-│   └── Unvalidated user input
+│   ├── SQL 注入漏洞
+│   └── 未验证的用户输入
 ├── 🟡 HIGH (5)
-│   ├── Race condition in cache
+│   ├── 缓存中的竞态条件
 │   └── ...
 ├── 🔵 MEDIUM (8)
 ├── ⚪ LOW (3)
-└── 📁 Files Changed (12)
+└── 📁 变更文件 (12)
     ├── [modified] src/api/users.py
     └── ...
 ```
 
-## ⚙️ Configuration
+## ⚙️ 配置说明
 
-### VSCode Settings
+### VSCode 设置
 
-Open Settings (`Ctrl+,`) and search for "insightor":
+打开设置（`Ctrl+,`）并搜索 "insightor"：
 
 ```json
 {
@@ -252,28 +279,28 @@ Open Settings (`Ctrl+,`) and search for "insightor":
 }
 ```
 
-### Project Configuration
+### 项目配置
 
-Create `.insightor.yml` in your repo:
+在仓库根目录创建 `.insightor.yml`：
 
 ```yaml
 review:
   custom_rules: |
-    1. All API routes must have authentication
-    2. Use parameterized queries, not string concatenation
+    1. 所有 API 路由必须有身份验证
+    2. 使用参数化查询，禁止字符串拼接 SQL
   
   conventions: |
-    - Use async/await instead of callbacks
-    - Error messages in Chinese
+    - 使用 async/await 而非回调
+    - 错误消息使用中文
   
   focus_categories: ["security", "performance"]
   min_severity: medium
   max_suggestions: 15
 ```
 
-### Custom Keyboard Shortcuts
+### 自定义快捷键
 
-Add to `keybindings.json`:
+添加到 `keybindings.json`：
 
 ```json
 [
@@ -283,155 +310,137 @@ Add to `keybindings.json`:
 ]
 ```
 
-## 🎨 Screenshots
+## 🔧 故障排查
 
-### Command Palette
-![Command Palette](docs/screenshots/command-palette.png)
+### ❌ "Insightor CLI not found"（找不到 Insightor CLI）
 
-### Sidebar View
-![Sidebar View](docs/screenshots/sidebar-view.png)
-
-### Finding Details
-![Finding Details](docs/screenshots/finding-details.png)
-
-### Markdown Report
-![Markdown Report](docs/screenshots/markdown-report.png)
-
-## 🔧 Troubleshooting
-
-### ❌ "Insightor CLI not found"
-
-**Check CLI installation:**
+**检查 CLI 安装：**
 ```bash
 python -m insightor --version
 ```
 
-**If command fails:**
+**如果命令失败：**
 ```bash
 pip install git+https://github.com/SCU-GuGuGaGa/Insightor.git
 ```
 
-**If using virtual environment:**
-- Set `insightor.pythonPath` in VSCode settings to your venv Python path
-- Example: `/path/to/venv/bin/python` or `C:\path\to\venv\Scripts\python.exe`
+**如果使用虚拟环境：**
+- 在 VSCode 设置中设置 `insightor.pythonPath` 为虚拟环境的 Python 路径
+- 示例：`/path/to/venv/bin/python` 或 `C:\path\to\venv\Scripts\python.exe`
 
-### ❌ "Review failed" or API errors
+### ❌ "Review failed"（审查失败）或 API 错误
 
-**Check API key:**
-1. Verify `.env` file exists in project root
-2. Check key format: `OPENAI_API_KEY=sk-proj-xxxxx` (no quotes, no spaces)
-3. Test manually:
+**检查 API Key：**
+1. 确认 `.env` 文件存在于项目根目录
+2. 检查 Key 格式：`OPENAI_API_KEY=sk-proj-xxxxx`（无引号，无空格）
+3. 手动测试：
    ```bash
    cd your-project
    python -m insightor review https://github.com/owner/repo/pull/123
    ```
 
-**Check network:**
-- Ensure you can access OpenAI/DeepSeek/Anthropic APIs
-- Check firewall/proxy settings
+**检查网络：**
+- 确保可以访问 OpenAI/DeepSeek/Anthropic API
+- 检查防火墙/代理设置
 
-### ❌ No results showing
+### ❌ 没有显示结果
 
-1. **Ensure workspace folder is open** (File → Open Folder)
-2. **Check Output panel**: View → Output → Select "Insightor"
-3. **Verify command completed**: Look for "Analysis complete" notification
+1. **确保工作区文件夹已打开**（文件 → 打开文件夹）
+2. **检查输出面板**：视图 → 输出 → 选择 "Insightor"
+3. **确认命令已完成**：查找 "Analysis complete" 通知
 
-### 🐛 Debug Mode
+### 🐛 调试模式
 
-**View detailed logs:**
-1. View → Output (`Ctrl+Shift+U`)
-2. Select "Insightor" from dropdown
-3. Check for error messages
+**查看详细日志：**
+1. 视图 → 输出（`Ctrl+Shift+U`）
+2. 从下拉菜单选择 "Insightor"
+3. 检查错误消息
 
-**Test CLI directly:**
+**直接测试 CLI：**
 ```bash
 cd your-project
 python -m insightor --help
 python -m insightor review https://github.com/owner/repo/pull/123 --depth quick
 ```
 
-## 🛠️ Development
+## 🛠️ 开发
 
-### Setup
+### 设置开发环境
 
 ```bash
 cd vscode-extension
 npm install
-npm run watch  # Auto-compile on changes
+npm run watch  # 自动编译变更
 ```
 
-### Debug
+### 调试
 
-1. Open `vscode-extension` in VSCode
-2. Press `F5` to launch Extension Development Host
-3. Test commands in the new window
+1. 在 VSCode 中打开 `vscode-extension` 目录
+2. 按 `F5` 启动扩展开发主机
+3. 在新窗口中测试命令
 
-### Build
+### 构建
 
 ```bash
-npm run compile  # Compile TypeScript
-npm run lint     # Check code style
-npm run package  # Create VSIX
+npm run compile  # 编译 TypeScript
+npm run lint     # 检查代码风格
+npm run package  # 创建 VSIX
 ```
 
-### Project Structure
+### 项目结构
 
 ```
 vscode-extension/
 ├── src/
-│   ├── extension.ts              # Entry point
+│   ├── extension.ts              # 入口点
 │   ├── commands/
-│   │   └── commandHandler.ts     # Command implementations
+│   │   └── commandHandler.ts     # 命令实现
 │   ├── services/
-│   │   └── insightorService.ts   # CLI integration
+│   │   └── insightorService.ts   # CLI 集成
 │   └── views/
-│       └── reviewTreeProvider.ts # Sidebar tree view
-├── resources/                    # Icons and assets
-├── package.json                  # Extension manifest
-└── tsconfig.json                 # TypeScript config
+│       └── reviewTreeProvider.ts # 侧边栏树状视图
+├── resources/                    # 图标和资源
+├── package.json                  # 扩展清单
+└── tsconfig.json                 # TypeScript 配置
 ```
 
-See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed development guide.
+详细开发指南请参阅 [DEVELOPMENT.md](DEVELOPMENT.md)。
 
-## 📚 Documentation
+## 📚 文档
 
-- [Quick Start Guide](QUICKSTART.md) - Get started in 5 minutes
-- [Development Guide](DEVELOPMENT.md) - Contributing and building
-- [Changelog](CHANGELOG.md) - Version history
-- [Main Insightor Repo](https://github.com/SCU-GuGuGaGa/Insightor) - CLI documentation
+- [快速开始指南](QUICKSTART.md) - 5 分钟上手
+- [开发指南](DEVELOPMENT.md) - 贡献和构建
+- [更新日志](CHANGELOG.md) - 版本历史
+- [Insightor 主仓库](https://github.com/SCU-GuGuGaGa/Insightor) - CLI 文档
 
-## 🤝 Contributing
+## 🤝 贡献
 
-Contributions are welcome! Please:
+欢迎贡献！请：
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run `npm run lint` and `npm run compile`
-5. Submit a pull request
+1. Fork 仓库
+2. 创建功能分支
+3. 进行修改
+4. 运行 `npm run lint` 和 `npm run compile`
+5. 提交 Pull Request
 
-## 📄 License
+## 📄 许可证
 
-MIT License - see [LICENSE](../LICENSE) for details
+MIT License - 详见 [LICENSE](../LICENSE)
 
-## 🙏 Acknowledgments
 
-- Built on top of [Insightor CLI](https://github.com/SCU-GuGuGaGa/Insightor)
-- Powered by LLMs (OpenAI, DeepSeek, Claude)
-- Inspired by the VSCode extension ecosystem
 
-## 📞 Support
+## 📞 支持
 
-- [Report Issues](https://github.com/SCU-GuGuGaGa/Insightor/issues)
-- [Discussions](https://github.com/SCU-GuGuGaGa/Insightor/discussions)
-- [Documentation](https://github.com/SCU-GuGuGaGa/Insightor)
+- [报告问题](https://github.com/SCU-GuGuGaGa/Insightor/issues)
+- [讨论区](https://github.com/SCU-GuGuGaGa/Insightor/discussions)
+- [文档](https://github.com/SCU-GuGuGaGa/Insightor)
 
 ---
 
 <div align="center">
 
-Made with ❤️ by the Insightor Team
+Made with ❤️ by Insightor Team
 
-[⬆ Back to Top](#insightor-vscode-extension)
+[⬆ 返回顶部](#insightor-vscode-扩展)
 
 </div>
