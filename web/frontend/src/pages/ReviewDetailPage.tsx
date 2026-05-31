@@ -170,10 +170,10 @@ export default function ReviewDetailPage() {
           <button onClick={() => navigate('/dashboard')} className="btn-ghost text-sm mb-2">
             &larr; Back
           </button>
-          <h1 className="text-lg font-semibold text-ink tracking-tight">
+          <h1 className="text-xl font-semibold text-ink tracking-tight">
             #{meta?.pr_url ? (meta.pr_url as string).split('/').pop() : id?.slice(0, 8)}
           </h1>
-          <p className="text-sm text-muted mt-1">
+          <p className="text-base text-muted mt-1">
             {meta?.model as string} &middot; {meta?.analysis_depth as string} &middot; {meta?.duration_ms ? `${(meta.duration_ms as number / 1000).toFixed(0)}s` : ''}
           </p>
         </div>
@@ -196,9 +196,9 @@ export default function ReviewDetailPage() {
       {/* Summary card */}
       {summary && (
         <div className="card">
-          <h3 className="font-semibold text-ink text-sm mb-2">Summary</h3>
-          <p className="text-sm text-muted leading-relaxed">{summary.overview as string}</p>
-          <div className="flex items-center gap-3 mt-3 text-xs text-faint">
+          <h3 className="font-semibold text-ink text-base mb-2">Summary</h3>
+          <p className="text-base text-muted leading-relaxed">{summary.overview as string}</p>
+          <div className="flex items-center gap-3 mt-3 text-sm text-faint">
             <span>{summary.pr_type as string}</span>
             <span>&middot;</span>
             <span>{summary.files_changed as number} files (+{summary.additions as number} / -{summary.deletions as number})</span>
@@ -207,13 +207,13 @@ export default function ReviewDetailPage() {
           {/* File walkthrough */}
           {fileWalkthrough.length > 0 && (
             <div className="mt-3 pt-3 border-t border-border">
-              <h4 className="text-xs font-medium text-muted mb-2">
+              <h4 className="text-sm font-medium text-muted mb-2">
                 Changed files ({fileWalkthrough.length})
               </h4>
               <div className="space-y-1 max-h-64 overflow-y-auto">
                 {fileWalkthrough.map((fw, i) => (
-                  <div key={i} className="flex items-start gap-2 text-xs group hover:bg-app-surface-elevated rounded-md px-1.5 py-1 -mx-1.5 transition-colors">
-                    <span className={`mt-0.5 w-4 text-center flex-shrink-0 font-mono text-2xs ${
+                  <div key={i} className="flex items-start gap-2 text-sm group hover:bg-app-surface-elevated rounded-md px-1.5 py-1 -mx-1.5 transition-colors">
+                    <span className={`mt-0.5 w-4 text-center flex-shrink-0 font-mono text-xs ${
                       fw.edit_type === 'added' ? 'text-success' :
                       fw.edit_type === 'deleted' ? 'text-error' :
                       fw.edit_type === 'renamed' ? 'text-warning' :
@@ -221,9 +221,9 @@ export default function ReviewDetailPage() {
                     }`}>
                       {fw.edit_type === 'added' ? '+' : fw.edit_type === 'deleted' ? '−' : fw.edit_type === 'renamed' ? '↻' : '~'}
                     </span>
-                    <code className="text-muted flex-1 min-w-0 truncate text-2xs">{fw.path}</code>
+                    <code className="text-muted flex-1 min-w-0 truncate text-xs">{fw.path}</code>
                     {fw.summary && (
-                      <span className="text-faint flex-shrink-0 hidden lg:inline truncate max-w-[240px] text-2xs">{fw.summary}</span>
+                      <span className="text-faint flex-shrink-0 hidden lg:inline truncate max-w-[240px] text-xs">{fw.summary}</span>
                     )}
                   </div>
                 ))}

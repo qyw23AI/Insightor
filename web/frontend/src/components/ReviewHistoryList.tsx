@@ -23,8 +23,8 @@ export default function ReviewHistoryList({ reviews, onSelect, onDelete, activeI
           <line x1="16" y1="13" x2="8" y2="13" />
           <line x1="16" y1="17" x2="8" y2="17" />
         </svg>
-        <p className="text-sm text-muted">No review history yet</p>
-        <p className="text-2xs text-faint mt-1">Start your first analysis above</p>
+        <p className="text-base text-muted">No review history yet</p>
+        <p className="text-xs text-faint mt-1">Start your first analysis above</p>
       </div>
     );
   }
@@ -38,12 +38,12 @@ export default function ReviewHistoryList({ reviews, onSelect, onDelete, activeI
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {/* Published */}
       <div className="space-y-2">
-        <h3 className="text-xs font-medium text-success flex items-center gap-2">
+        <h3 className="text-sm font-medium text-success flex items-center gap-2">
           Published
           <span className="text-faint font-normal">({published.length})</span>
         </h3>
         {published.length === 0 ? (
-          <p className="text-2xs text-faint py-4">No published reviews</p>
+          <p className="text-xs text-faint py-4">No published reviews</p>
         ) : (
           published.slice(0, 5).map(r => (
             <ReviewCard key={r.id} review={r} active={activeId === r.id} onClick={() => onSelect(r)} />
@@ -53,12 +53,12 @@ export default function ReviewHistoryList({ reviews, onSelect, onDelete, activeI
 
       {/* Drafts */}
       <div className="space-y-2">
-        <h3 className="text-xs font-medium text-accent flex items-center gap-2">
+        <h3 className="text-sm font-medium text-accent flex items-center gap-2">
           Drafts
           <span className="text-faint font-normal">({drafts.length})</span>
         </h3>
         {drafts.length === 0 ? (
-          <p className="text-2xs text-faint py-4">No draft reviews</p>
+          <p className="text-xs text-faint py-4">No draft reviews</p>
         ) : (
           drafts.slice(0, 5).map(r => (
             <div key={r.id} className="relative group">

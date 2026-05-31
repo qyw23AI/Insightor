@@ -54,8 +54,8 @@ export default function PREntryList({ entries, onBatchReview, onDelete, disabled
   return (
     <div className="card space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-ink">Recent PRs ({entries.length})</h3>
-        <button onClick={toggleAll} className="btn-ghost btn-sm text-xs">
+        <h3 className="text-base font-semibold text-ink">Recent PRs ({entries.length})</h3>
+        <button onClick={toggleAll} className="btn-ghost btn-sm text-sm">
           {selected.size === entries.length ? 'Deselect all' : 'Select all'}
         </button>
       </div>
@@ -77,10 +77,10 @@ export default function PREntryList({ entries, onBatchReview, onDelete, disabled
               className="checkbox"
             />
             <div className="flex-1 min-w-0">
-              <p className="text-sm text-ink truncate">{e.repo}#{e.pr_number}</p>
-              <p className="text-2xs text-faint truncate font-mono">{e.pr_url}</p>
+              <p className="text-base text-ink truncate">{e.repo}#{e.pr_number}</p>
+              <p className="text-xs text-faint truncate font-mono">{e.pr_url}</p>
             </div>
-            <span className={`badge text-2xs ${
+            <span className={`badge text-xs ${
               e.status === 'done' ? 'badge-success' :
               e.status === 'running' ? 'badge-info' :
               'badge-low'
@@ -105,19 +105,19 @@ export default function PREntryList({ entries, onBatchReview, onDelete, disabled
         <div className="pt-3 border-t border-border space-y-3">
           <div className="flex flex-wrap gap-3">
             <div className="flex-1 min-w-[120px]">
-              <label className="block text-xs font-medium text-muted mb-1">Tool</label>
+              <label className="block text-sm font-medium text-muted mb-1">Tool</label>
               <select value={tool} onChange={e => setTool(e.target.value)} className="input text-sm" disabled={disabled}>
                 {TOOLS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
             </div>
             <div className="flex-1 min-w-[120px]">
-              <label className="block text-xs font-medium text-muted mb-1">Depth</label>
+              <label className="block text-sm font-medium text-muted mb-1">Depth</label>
               <select value={depth} onChange={e => setDepth(e.target.value)} className="input text-sm" disabled={disabled}>
                 {DEPTHS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
               </select>
             </div>
             <div className="flex-1 min-w-[150px]">
-              <label className="block text-xs font-medium text-muted mb-1">Model (optional)</label>
+              <label className="block text-sm font-medium text-muted mb-1">Model (optional)</label>
               <input
                 type="text" value={model} onChange={e => setModel(e.target.value)}
                 placeholder="deepseek-v4-pro" className="input text-sm font-mono" disabled={disabled}

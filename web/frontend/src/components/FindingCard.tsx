@@ -26,7 +26,7 @@ function ConfidenceBar({ confidence }: { confidence: number }) {
   const pct = Math.round(confidence * 100);
   const color = pct >= 80 ? 'bg-success' : pct >= 50 ? 'bg-warning' : 'bg-error';
   return (
-    <div className="flex items-center gap-2 text-2xs">
+    <div className="flex items-center gap-2 text-xs">
       <span className="text-faint w-14">Confidence</span>
       <div className="flex-1 h-1 bg-app-surface-high rounded-full overflow-hidden">
         <div
@@ -56,17 +56,17 @@ export default function FindingCard({ finding, index, showFeedback, feedbackUI, 
     <div className="card space-y-3 animate-fade-in" style={{ animationDelay: `${Math.min(index * 40, 400)}ms`, animationFillMode: 'backwards' }}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-2xs text-faint font-mono tabular-nums">#{index + 1}</span>
+          <span className="text-xs text-faint font-mono tabular-nums">#{index + 1}</span>
           <span className={getSeverityBadge(finding.severity)}>{finding.severity}</span>
-          <span className="text-2xs px-2 py-0.5 rounded bg-app-surface-high text-muted">{finding.category}</span>
+          <span className="text-xs px-2 py-0.5 rounded bg-app-surface-high text-muted">{finding.category}</span>
         </div>
         <ConfidenceBar confidence={finding.confidence} />
       </div>
 
-      <h4 className="font-medium text-ink text-sm">{finding.title}</h4>
-      <p className="text-xs text-muted leading-relaxed">{finding.description}</p>
+      <h4 className="font-medium text-ink text-base">{finding.title}</h4>
+      <p className="text-sm text-muted leading-relaxed">{finding.description}</p>
 
-      <div className="text-2xs font-mono text-faint flex items-center gap-1 flex-wrap">
+      <div className="text-xs font-mono text-faint flex items-center gap-1 flex-wrap">
         {onJumpToFile ? (
           <button
             onClick={() => onJumpToFile(finding.location.path)}

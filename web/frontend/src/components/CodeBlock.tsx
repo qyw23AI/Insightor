@@ -15,7 +15,7 @@ export default function CodeBlock({ code, label, language }: Props) {
   return (
     <div className="space-y-1.5">
       {label && (
-        <p className="text-2xs font-medium text-faint">{label}</p>
+        <p className="text-xs font-medium text-faint">{label}</p>
       )}
       <div className="rounded-md overflow-hidden border border-border">
         <SyntaxHighlighter
@@ -25,7 +25,7 @@ export default function CodeBlock({ code, label, language }: Props) {
             margin: 0,
             padding: '12px 16px',
             background: 'oklch(0.11 0.003 268)',
-            fontSize: '13px',
+            fontSize: '14px',
             borderRadius: '0',
             lineHeight: '1.6',
           }}

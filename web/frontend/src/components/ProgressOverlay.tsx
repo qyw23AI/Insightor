@@ -40,7 +40,7 @@ function StepTimeline({ job }: { job: JobProgress }) {
         return (
           <div
             key={label}
-            className={`flex items-center gap-2 px-1 py-0.5 rounded text-2xs transition-colors ${
+            className={`flex items-center gap-2 px-1 py-0.5 rounded text-xs transition-colors ${
               isPast || isDone ? 'text-success/70' :
               isCurrent ? 'text-primary' :
               'text-faint/40'
@@ -86,10 +86,10 @@ function JobCard({ job }: { job: JobProgress }) {
       {/* Header */}
       <div className="flex items-center gap-2.5 mb-3">
         <div className={`w-2 h-2 rounded-full flex-shrink-0 ${dotColor[job.status] || dotColor.pending}`} />
-        <span className="text-sm font-medium text-ink truncate">
+        <span className="text-base font-medium text-ink truncate">
           {job.repo}#{job.prNumber}
         </span>
-        <span className="text-2xs ml-auto flex-shrink-0">
+        <span className="text-xs ml-auto flex-shrink-0">
           {job.status === 'running' && <span className="text-primary">running</span>}
           {job.status === 'done' && <span className="text-success">Done</span>}
           {job.status === 'error' && <span className="text-error">Failed</span>}
@@ -102,19 +102,19 @@ function JobCard({ job }: { job: JobProgress }) {
 
       {/* Error message */}
       {job.status === 'error' && job.error && (
-        <p className="mt-2 text-2xs text-error/80 truncate">{job.error}</p>
+        <p className="mt-2 text-xs text-error/80 truncate">{job.error}</p>
       )}
 
       {/* Findings counter */}
       {job.findings.length > 0 && (
-        <div className="mt-2 text-2xs text-primary">
+        <div className="mt-2 text-xs text-primary">
           {job.findings.length} finding{job.findings.length > 1 ? 's' : ''} so far
         </div>
       )}
 
       {/* Result summary for done jobs */}
       {job.status === 'done' && job.resultSummary && (
-        <div className="mt-3 flex flex-wrap gap-2 text-2xs">
+        <div className="mt-3 flex flex-wrap gap-2 text-xs">
           <span className="px-2 py-0.5 rounded bg-app-surface-high text-success">
             {job.resultSummary.findings_count} findings
           </span>
@@ -180,7 +180,7 @@ export default function ProgressOverlay({ jobs, overallProgress, overallDone }: 
                 ? 'Analysis complete'
                 : `Analyzing ${jobList.length} PR${jobList.length > 1 ? 's' : ''}...`}
             </h3>
-            <p className="text-xs text-muted">
+            <p className="text-sm text-muted">
               {runningCount > 0 && `${runningCount} running · `}
               {doneCount} done · {errorCount} failed
               {overallDone && totalTokens > 0 && ` · ${totalTokens.toLocaleString()} tokens used`}
@@ -189,8 +189,8 @@ export default function ProgressOverlay({ jobs, overallProgress, overallDone }: 
         </div>
         {!overallDone && (
           <div className="text-right">
-            <div className="text-xl font-semibold text-primary tabular-nums">{overallProgress}%</div>
-            <div className="text-2xs text-muted">complete</div>
+            <div className="text-2xl font-semibold text-primary tabular-nums">{overallProgress}%</div>
+            <div className="text-xs text-muted">complete</div>
           </div>
         )}
       </div>
@@ -231,7 +231,7 @@ export default function ProgressOverlay({ jobs, overallProgress, overallDone }: 
 
       {/* Token usage summary */}
       {totalTokens > 0 && (
-        <div className="flex items-center justify-between pt-3 border-t border-border text-sm">
+        <div className="flex items-center justify-between pt-3 border-t border-border text-base">
           <span className="text-muted">Total tokens</span>
           <span className="text-accent font-mono font-medium tabular-nums">{totalTokens.toLocaleString()}</span>
         </div>

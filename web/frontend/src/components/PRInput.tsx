@@ -52,9 +52,9 @@ export default function PRInput({ onSubmit, onImport, disabled }: Props) {
   return (
     <form onSubmit={handleSubmit} className="card space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-ink">New analysis</h2>
+        <h2 className="text-base font-semibold text-ink">New analysis</h2>
         {urlCount > 0 && (
-          <span className="text-2xs text-muted tabular-nums">{urlCount} URL{urlCount > 1 ? 's' : ''}</span>
+          <span className="text-xs text-muted tabular-nums">{urlCount} URL{urlCount > 1 ? 's' : ''}</span>
         )}
       </div>
 
@@ -62,25 +62,25 @@ export default function PRInput({ onSubmit, onImport, disabled }: Props) {
         placeholder={`Paste GitHub PR URLs — one per line, or comma-separated\nhttps://github.com/owner/repo/pull/123\nhttps://github.com/owner/repo/pull/456`}
         value={urlText}
         onChange={e => setUrlText(e.target.value)}
-        className="input min-h-[100px] resize-y font-mono text-xs"
+        className="input min-h-[100px] resize-y font-mono text-sm"
         disabled={disabled}
       />
 
       <div className="flex flex-wrap gap-3">
         <div className="flex-1 min-w-[160px]">
-          <label className="block text-xs font-medium text-muted mb-1.5">Tool</label>
+          <label className="block text-sm font-medium text-muted mb-1.5">Tool</label>
           <select value={tool} onChange={e => setTool(e.target.value)} className="input" disabled={disabled}>
             {TOOLS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
         </div>
         <div className="flex-1 min-w-[160px]">
-          <label className="block text-xs font-medium text-muted mb-1.5">Depth</label>
+          <label className="block text-sm font-medium text-muted mb-1.5">Depth</label>
           <select value={depth} onChange={e => setDepth(e.target.value)} className="input" disabled={disabled}>
             {DEPTHS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
           </select>
         </div>
         <div className="flex-1 min-w-[160px]">
-          <label className="block text-xs font-medium text-muted mb-1.5">Model (optional)</label>
+          <label className="block text-sm font-medium text-muted mb-1.5">Model (optional)</label>
           <input
             type="text" value={model} onChange={e => setModel(e.target.value)}
             placeholder="deepseek-v4-pro" className="input font-mono" disabled={disabled}

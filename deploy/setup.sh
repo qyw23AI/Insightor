@@ -83,11 +83,10 @@ fi
 
 # ---------- 5. 拉取代码 ----------
 if [ -d "$APP_DIR/.git" ]; then
-    echo "[5/8] 代码已存在, 执行 git pull..."
+    echo "[5/8] 代码已存在, 执行 git pull --ff-only..."
     cd "$APP_DIR"
-    # git fetch origin
-    # git checkout "$BRANCH"
-    # git reset --hard "origin/$BRANCH"
+    git checkout "$BRANCH"
+    git pull --ff-only origin "$BRANCH"
 else
     echo "[5/8] 克隆仓库..."
     git clone --branch "$BRANCH" "$REPO_URL" "$APP_DIR"
@@ -96,12 +95,17 @@ fi
 # ---------- 6. 安装 Python 依赖 ----------
 echo "[6/8] 安装 Python 依赖..."
 cd "$APP_DIR"
+# Clean Python caches for a clean rebuild
+find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
 "${CONDA_DIR}/envs/${CONDA_ENV}/bin/pip" install --upgrade pip
 "${CONDA_DIR}/envs/${CONDA_ENV}/bin/pip" install -e ".[web]"
 
 # ---------- 7. 构建前端 + 初始化数据库 ----------
 echo "[7/8] 构建前端 & 初始化数据库..."
 cd "$APP_DIR/web/frontend"
+# Clean frontend caches for a clean rebuild
+rm -rf node_modules dist .vite
 npm install
 npm run build
 npm prune --omit=dev
