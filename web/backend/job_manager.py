@@ -18,11 +18,29 @@ logger = logging.getLogger("insightor.web.job_manager")
 
 JOB_STORE = Path(".insightor/jobs")
 
-# Reference-counting lock for GITHUB_TOKEN env var — prevents race
-# between concurrent jobs that all need the token.
+# Reference-counting lock for env vars — prevents race between concurrent jobs
+# that need different per-user API keys / tokens. On first job we save current
+# env var state; each subsequent job overwrites; last job restores the original.
 _env_lock = asyncio.Lock()
 _active_token_jobs = 0
-_saved_env_token: str | None = None
+_saved_env_vars: dict[str, str | None] = {}
+
+# Config keys to inject as env vars. If a value is a list, set each alias to the
+# same value (handles both _API_BASE / _BASE_URL naming conventions).
+_CONFIG_ENV_MAP: dict[str, str | list[str]] = {
+    "GITHUB_TOKEN": "GITHUB_TOKEN",
+    "ANTHROPIC_API_KEY": "ANTHROPIC_API_KEY",
+    "OPENAI_API_KEY": "OPENAI_API_KEY",
+    "DEEPSEEK_API_KEY": "DEEPSEEK_API_KEY",
+    "ANTHROPIC_BASE_URL": ["ANTHROPIC_API_BASE", "ANTHROPIC_BASE_URL"],
+    "OPENAI_API_BASE": ["OPENAI_API_BASE", "OPENAI_BASE_URL"],
+    "DEEPSEEK_API_BASE": ["DEEPSEEK_API_BASE", "DEEPSEEK_BASE_URL"],
+    "INSIGHTOR_MODELS_PRIMARY": "INSIGHTOR_MODELS_PRIMARY",
+    "INSIGHTOR_MODELS_WEAK": "INSIGHTOR_MODELS_WEAK",
+    "INSIGHTOR_MODELS_REASONING": "INSIGHTOR_MODELS_REASONING",
+    "INSIGHTOR_REVIEW_MIN_SEVERITY": "INSIGHTOR_REVIEW_MIN_SEVERITY",
+    "INSIGHTOR_REVIEW_MAX_FINDINGS": "INSIGHTOR_REVIEW_MAX_FINDINGS",
+}
 
 # Known pipeline steps for progress estimation
 _PIPELINE_STEPS = [
@@ -78,6 +96,31 @@ def _make_progress_callback(sse_manager: SSEManager, job_id: str, job_dict: dict
     return callback
 
 
+def _iter_env_keys(user_configs: dict[str, str]):
+    """Yield all env var keys that would be set for the given config dict."""
+    for cfg_key in user_configs:
+        targets = _CONFIG_ENV_MAP.get(cfg_key)
+        if not targets:
+            continue
+        if isinstance(targets, str):
+            yield targets
+        else:
+            yield from targets
+
+
+def _iter_env_items(user_configs: dict[str, str]):
+    """Yield (env_key, value) pairs for all config entries that have an env mapping."""
+    for cfg_key, value in user_configs.items():
+        targets = _CONFIG_ENV_MAP.get(cfg_key)
+        if not targets:
+            continue
+        if isinstance(targets, str):
+            yield targets, value
+        else:
+            for alias in targets:
+                yield alias, value
+
+
 class JobManager:
     def __init__(self):
         self._jobs: dict[str, dict] = {}
@@ -115,9 +158,9 @@ class JobManager:
         self,
         job_id: str,
         sse_manager: SSEManager,
-        github_token: str | None = None,
+        user_configs: dict[str, str] | None = None,
     ):
-        global _active_token_jobs, _saved_env_token
+        global _active_token_jobs, _saved_env_vars
 
         job = self._jobs.get(job_id)
         if not job:
@@ -132,12 +175,17 @@ class JobManager:
         pipeline = ReviewPipeline(model=job.get("model"))
 
         try:
-            # --- Safely set GITHUB_TOKEN with reference counting ---
+            # --- Safely set user configs as env vars with reference counting ---
+            user_configs = user_configs or {}
             async with _env_lock:
-                if github_token:
+                if user_configs:
                     if _active_token_jobs == 0:
-                        _saved_env_token = os.environ.get("GITHUB_TOKEN")
-                    os.environ["GITHUB_TOKEN"] = github_token
+                        # Save current state before first job overwrites anything
+                        _saved_env_vars.clear()
+                        for env_key in _iter_env_keys(user_configs):
+                            _saved_env_vars[env_key] = os.environ.get(env_key)
+                    for env_key, env_val in _iter_env_items(user_configs):
+                        os.environ[env_key] = env_val
                     _active_token_jobs += 1
 
             # Run the pipeline (GitHubProvider reads token from env on init)
@@ -158,6 +206,7 @@ class JobManager:
             try:
                 from insightor.providers.github_provider import GitHubProvider
 
+                github_token = user_configs.get("GITHUB_TOKEN")
                 provider = GitHubProvider(token=github_token)
                 raw_diff = provider.get_diff(job["pr_url"])  # sync, returns bytes
                 if isinstance(raw_diff, bytes):
@@ -204,16 +253,17 @@ class JobManager:
             )
 
         finally:
-            # --- Restore env var with reference counting ---
-            if github_token:
+            # --- Restore env vars with reference counting ---
+            if user_configs:
                 async with _env_lock:
                     _active_token_jobs -= 1
                     if _active_token_jobs == 0:
-                        if _saved_env_token is not None:
-                            os.environ["GITHUB_TOKEN"] = _saved_env_token
-                        elif "GITHUB_TOKEN" in os.environ:
-                            del os.environ["GITHUB_TOKEN"]
-                        _saved_env_token = None
+                        for env_key, saved_val in _saved_env_vars.items():
+                            if saved_val is not None:
+                                os.environ[env_key] = saved_val
+                            elif env_key in os.environ:
+                                del os.environ[env_key]
+                        _saved_env_vars.clear()
 
             job["finished_at"] = _now_iso()
             self._save_job(job_id)

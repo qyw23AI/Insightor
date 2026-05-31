@@ -20,6 +20,7 @@ __pycache__/
 # Web — frontend build artifacts
 web/frontend/node_modules/
 web/frontend/dist/
+web/frontend/.vite/
 
 # Web — Python cache
 web/backend/__pycache__/

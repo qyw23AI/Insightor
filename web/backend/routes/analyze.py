@@ -42,31 +42,31 @@ class JobInfo(BaseModel):
     pr_number: int
 
 
-async def _get_github_token(user_id: str, db: AsyncSession) -> str | None:
+async def _get_user_configs(user_id: str, db: AsyncSession) -> dict[str, str]:
+    """读取用户在数据库中存储的全部配置，解密后返回 dict。
+
+    用户登录后在 Web UI 配置页面填入 API Key / Token，
+    加密存入 UserConfig 表，此处读出解密后注入环境变量供管线使用。
+    """
     result = await db.execute(
-        select(UserConfig).where(
-            UserConfig.user_id == user_id,
-            UserConfig.key == "GITHUB_TOKEN",
-        )
+        select(UserConfig).where(UserConfig.user_id == user_id)
     )
-    config = result.scalar_one_or_none()
-    if config and config.value:
-        return decrypt(config.value)
-    return None
+    configs = result.scalars().all()
+    return {c.key: decrypt(c.value) for c in configs if c.value}
 
 
 async def _run_and_save(
     job_id: str,
-    github_token: str | None,
+    user_configs: dict[str, str],
 ):
     """Run analysis in background and persist results to DB."""
     import datetime as dt
     from datetime import timezone
 
-    logger.info(f"[job={job_id}] Background task started, token={'***' if github_token else 'None'}")
+    logger.info(f"[job={job_id}] Background task started, config_keys={list(user_configs.keys())}")
 
     try:
-        await job_manager.run(job_id, sse_manager, github_token)
+        await job_manager.run(job_id, sse_manager, user_configs)
         logger.info(f"[job={job_id}] Pipeline finished, status={job_manager.get_status(job_id)}")
     except Exception as e:
         logger.error(f"[job={job_id}] Pipeline CRASHED: {e}\n{traceback.format_exc()}")
@@ -185,8 +185,8 @@ async def create_analysis(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    github_token = await _get_github_token(current_user.id, db)
-    logger.info(f"Creating analysis for {len(req.pr_urls)} PR(s) by user={current_user.username}, token={'***' if github_token else 'None'}")
+    user_configs = await _get_user_configs(current_user.id, db)
+    logger.info(f"Creating analysis for {len(req.pr_urls)} PR(s) by user={current_user.username}, config_keys={list(user_configs.keys())}")
 
     jobs = []
     for url in req.pr_urls:
@@ -243,7 +243,7 @@ async def create_analysis(
 
         # Launch background task with error callback
         task = asyncio.create_task(
-            _run_and_save(job_id, github_token)
+            _run_and_save(job_id, user_configs)
         )
         task.add_done_callback(_on_task_done(job_id))
         logger.info(f"[job={job_id}] Background task scheduled")

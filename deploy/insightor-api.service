@@ -1,0 +1,33 @@
+[Unit]
+Description=Insightor Web API Server
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=insightor
+Group=insightor
+
+# === 根据你的实际路径修改以下两行 ===
+WorkingDirectory=/home/insightor/Insightor
+Environment="PATH=/home/insightor/miniconda3/envs/insightor/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=/home/insightor/miniconda3/envs/insightor/bin/uvicorn web.backend.app:app --host 0.0.0.0 --port 8000 --workers 4
+
+# 进程管理
+Restart=always
+RestartSec=5
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+# 日志
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=insightor-api
+
+# 资源限制
+LimitNOFILE=65536
+MemoryMax=2G
+
+[Install]
+WantedBy=multi-user.target
