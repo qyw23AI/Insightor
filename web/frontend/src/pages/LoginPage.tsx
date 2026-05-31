@@ -31,22 +31,22 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-app-bg px-4">
-      <div className="w-full max-w-sm space-y-7 animate-fade-in">
+      <div className="w-full max-w-md space-y-8 animate-fade-in">
 
         {/* Brand */}
         <div className="text-center">
-          <div className="w-11 h-11 rounded-xl bg-primary flex items-center justify-center mx-auto mb-4">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <div className="w-14 h-14 rounded-xl bg-primary flex items-center justify-center mx-auto mb-4">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2C8 4.5 5.5 8.5 5.5 12C5.5 15.5 8 19.5 12 22C16 19.5 18.5 15.5 18.5 12C18.5 8.5 16 4.5 12 2Z" />
-              <circle cx="12" cy="12" r="2.5" />
+              <circle cx="12" cy="12" r="3" />
             </svg>
           </div>
-          <h1 className="text-lg font-semibold text-ink tracking-tight">Insightor</h1>
-          <p className="mt-1 text-sm text-muted">AI-powered PR review console</p>
+          <h1 className="text-2xl font-semibold text-ink tracking-tight">Insightor</h1>
+          <p className="mt-1.5 text-base text-muted">AI-powered PR review console</p>
         </div>
 
         {/* Card */}
-        <div className="card space-y-4">
+        <div className="card space-y-5">
           {/* Tab switcher */}
           <div className="flex bg-app-surface rounded-md p-1 gap-1">
             {(['login', 'register'] as const).map(t => (
@@ -54,7 +54,7 @@ export default function LoginPage() {
                 key={t}
                 type="button"
                 onClick={() => setTab(t)}
-                className={`flex-1 py-1.5 text-sm font-medium rounded transition-all duration-150 ${
+                className={`flex-1 py-2 text-base font-medium rounded transition-all duration-150 ${
                   tab === t
                     ? 'bg-app-surface-high text-ink'
                     : 'text-muted hover:text-ink'
@@ -66,9 +66,9 @@ export default function LoginPage() {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-3">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="username" className="block text-xs font-medium text-muted mb-1.5">
+              <label htmlFor="username" className="block text-sm font-medium text-muted mb-1.5">
                 Username
               </label>
               <input
@@ -78,7 +78,7 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <label htmlFor="password" className="block text-xs font-medium text-muted mb-1.5">
+              <label htmlFor="password" className="block text-sm font-medium text-muted mb-1.5">
                 Password
               </label>
               <input
@@ -90,7 +90,7 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <div className="text-xs text-error bg-error/8 border border-error/15 rounded px-3 py-2">
+              <div className="text-sm text-error bg-error/10 border border-error/15 rounded-md px-3 py-2.5">
                 {error}
               </div>
             )}
@@ -100,7 +100,7 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <p className="text-xs text-center text-muted pt-0.5">
+          <p className="text-sm text-center text-muted pt-0.5">
             {tab === 'login' ? (
               <>Default: <span className="text-ink font-mono">admin / admin123</span></>
             ) : (

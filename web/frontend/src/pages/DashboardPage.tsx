@@ -114,11 +114,11 @@ export default function DashboardPage() {
     <div className="p-6 max-w-4xl mx-auto space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-base font-semibold text-ink tracking-tight">Dashboard</h1>
-          <p className="text-xs text-muted mt-0.5">PR review console</p>
+          <h1 className="text-xl font-semibold text-ink tracking-tight">Dashboard</h1>
+          <p className="text-sm text-muted mt-0.5">PR review console</p>
         </div>
         {reviews.length > 0 && (
-          <div className="text-xs text-faint tabular-nums">
+          <div className="text-sm text-faint tabular-nums">
             {reviews.filter(r => r.published).length} published &middot; {reviews.filter(r => !r.published && r.status === 'done').length} drafts
           </div>
         )}

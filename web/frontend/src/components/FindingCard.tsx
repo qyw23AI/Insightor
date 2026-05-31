@@ -71,26 +71,26 @@ export default function FindingCard({ finding, index, showFeedback, feedbackUI, 
       </div>
 
       {/* Title + description */}
-      <h4 className="text-sm font-semibold text-ink leading-snug">{finding.title}</h4>
-      <p className="text-xs text-muted leading-relaxed">{finding.description}</p>
+      <h4 className="text-base font-semibold text-ink leading-snug">{finding.title}</h4>
+      <p className="text-sm text-muted leading-relaxed">{finding.description}</p>
 
       {/* File path chip */}
       <div>
         {onJumpToFile ? (
           <button
             onClick={() => onJumpToFile(finding.location.path)}
-            className="inline-flex items-center gap-1 text-[11px] font-mono text-accent hover:text-accent-hover transition-colors px-2 py-0.5 rounded"
+            className="inline-flex items-center gap-1 text-xs font-mono text-accent hover:text-accent-hover transition-colors px-2 py-0.5 rounded"
             style={{ background: 'oklch(0.68 0.16 175 / 0.08)', border: '1px solid oklch(0.68 0.16 175 / 0.15)' }}
             title="Jump to file in Diff view"
           >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
               <polyline points="14 2 14 8 20 8" />
             </svg>
             {fileName}:{finding.location.range.start.line}
           </button>
         ) : (
-          <span className="inline-flex items-center gap-1 text-[11px] font-mono text-faint px-2 py-0.5 rounded"
+          <span className="inline-flex items-center gap-1 text-xs font-mono text-faint px-2 py-0.5 rounded"
             style={{ background: 'var(--color-surface-high)' }}>
             {fileName}:{finding.location.range.start.line}
           </span>
