@@ -12,8 +12,14 @@
 ---
 
 ## 🚀 快速开始
-待补充：快速开始内容
-<!-- 待补充：快速开始内容 -->
+
+## 网页输入：http://116.196.112.91:8000，最简开始
+
+# demo视频链接：
+
+### bilibili暂时待审
+
+### Google Drive：https://drive.google.com/file/d/17_mvx5ll6w_DfHpfPI-3EK21IcKg-BT1/view?usp=sharing
 
 ---
 
@@ -23,11 +29,9 @@ Insightor将 AI 驱动的代码审查能力直接集成到网页或是您的vsco
 
 ### Insightor 提供三种使用方式
 
-
 - **Web 控制台** — 可视化界面，支持多用户、实时进度、Diff 审查
 - **VSCode 扩展**（本扩展）— IDE 内审查，侧边栏展示结果，一键应用建议
 - **CLI 工具** — 命令行一键审查，生成 Markdown 报告
-
 
 ### 为什么选择 Insightor？
 
@@ -38,18 +42,17 @@ Insightor将 AI 驱动的代码审查能力直接集成到网页或是您的vsco
 - **合并就绪评分** — 0-100 分置信度评分，辅助决策
 - **人机协同** — 审查并确认 AI 发现后再发布
 
-
 ## ✨ 功能特性
 
 ### 核心命令
 
-| 命令 | 功能说明 | 快捷键 |
-|------|----------|--------|
-| **Full Review** | 完整分析（总结 + 风险 + 审查） | - |
-| **Review PR** | 详细代码审查和建议 | - |
-| **Describe PR** | 生成 PR 描述和文件走览 | - |
-| **Analyze Risks** | 识别安全、性能、并发风险 | - |
-| **Publish Review** | 发布人工确认的审查到 GitHub | - |
+| 命令                     | 功能说明                       | 快捷键 |
+| ------------------------ | ------------------------------ | ------ |
+| **Full Review**    | 完整分析（总结 + 风险 + 审查） | -      |
+| **Review PR**      | 详细代码审查和建议             | -      |
+| **Describe PR**    | 生成 PR 描述和文件走览         | -      |
+| **Analyze Risks**  | 识别安全、性能、并发风险       | -      |
+| **Publish Review** | 发布人工确认的审查到 GitHub    | -      |
 
 ### 侧边栏视图
 
@@ -61,24 +64,24 @@ Insightor将 AI 驱动的代码审查能力直接集成到网页或是您的vsco
 
 ### 分析深度
 
-| 深度 | 耗时 | Token | 适用场景 |
-|------|------|-------|----------|
-| **Quick** | ~15s | ~3K | 小型 PR，快速检查 |
-| **Standard** | ~30s | ~8K | 大多数 PR（默认） |
-| **Deep** | ~60s | ~16K | 关键变更，复杂逻辑 |
+| 深度               | 耗时 | Token | 适用场景           |
+| ------------------ | ---- | ----- | ------------------ |
+| **Quick**    | ~15s | ~3K   | 小型 PR，快速检查  |
+| **Standard** | ~30s | ~8K   | 大多数 PR（默认）  |
+| **Deep**     | ~60s | ~16K  | 关键变更，复杂逻辑 |
 
 ## 📦 详细安装
-
-
 
 ### 方式一：安装 Insightor CLI
 
 **方式 A：从 PyPI 安装（推荐）**
+
 ```bash
 pip install git+https://github.com/SCU-GuGuGaGa/Insightor.git
 ```
 
 **方式 B：从源码安装**
+
 ```bash
 git clone https://github.com/SCU-GuGuGaGa/Insightor.git
 cd Insightor
@@ -86,6 +89,7 @@ pip install -e .
 ```
 
 **验证安装：**
+
 ```bash
 python -m insightor --version
 # 应输出：insightor 0.1.0
@@ -113,11 +117,10 @@ ANTHROPIC_API_KEY=sk-ant-xxxxx         # Claude
 3. 点击 `...` 菜单 → `从 VSIX 安装...`
 4. 选择下载的文件
 
-**方式 B：从VSCode扩展市场安装**  
+**方式 B：从VSCode扩展市场安装**
+
 1. 打开 VSCode → 扩展（`Ctrl+Shift+X`）
 2. 搜索 Insightor，选择并下载
-
-
 
 ## 🚀 使用方法
 
@@ -161,9 +164,11 @@ uvicorn web.backend.app:app --host 0.0.0.0 --port 8000
 ### VSCode 扩展使用
 
 **1️⃣ 打开命令面板**
+
 - 按 `Ctrl+Shift+P`（Windows/Linux）或 `Cmd+Shift+P`（Mac）
 
 **2️⃣ 选择命令**
+
 - `Insightor: Full Review` - 完整分析（首次使用推荐）
 - `Insightor: Review PR` - 仅代码审查
 - `Insightor: Describe PR` - 生成 PR 描述
@@ -171,16 +176,19 @@ uvicorn web.backend.app:app --host 0.0.0.0 --port 8000
 - `Insightor: Publish Review` - 发布结果到 GitHub
 
 **3️⃣ 输入 PR URL**
+
 ```
 https://github.com/owner/repo/pull/123
 ```
 
 **4️⃣ 选择分析深度**
+
 - `quick` - 15 秒，小型 PR
 - `standard` - 30 秒，大多数 PR（默认）
 - `deep` - 60 秒，关键变更
 
 **5️⃣ 查看结果**
+
 - **侧边栏**：点击活动栏（左侧）的 Insightor 图标
 - **Markdown**：自动在编辑器中打开完整报告
 - **点击发现**：直接跳转到代码位置
@@ -310,22 +318,26 @@ review:
 ### ❌ "Insightor CLI not found"（找不到 Insightor CLI）
 
 **检查 CLI 安装：**
+
 ```bash
 python -m insightor --version
 ```
 
 **如果命令失败：**
+
 ```bash
 pip install git+https://github.com/SCU-GuGuGaGa/Insightor.git
 ```
 
 **如果使用虚拟环境：**
+
 - 在 VSCode 设置中设置 `insightor.pythonPath` 为虚拟环境的 Python 路径
 - 示例：`/path/to/venv/bin/python` 或 `C:\path\to\venv\Scripts\python.exe`
 
 ### ❌ "Review failed"（审查失败）或 API 错误
 
 **检查 API Key：**
+
 1. 确认 `.env` 文件存在于项目根目录
 2. 检查 Key 格式：`OPENAI_API_KEY=sk-proj-xxxxx`（无引号，无空格）
 3. 手动测试：
@@ -335,6 +347,7 @@ pip install git+https://github.com/SCU-GuGuGaGa/Insightor.git
    ```
 
 **检查网络：**
+
 - 确保可以访问 OpenAI/DeepSeek/Anthropic API
 - 检查防火墙/代理设置
 
@@ -347,11 +360,13 @@ pip install git+https://github.com/SCU-GuGuGaGa/Insightor.git
 ### 🐛 调试模式
 
 **查看详细日志：**
+
 1. 视图 → 输出（`Ctrl+Shift+U`）
 2. 从下拉菜单选择 "Insightor"
 3. 检查错误消息
 
 **直接测试 CLI：**
+
 ```bash
 cd your-project
 python -m insightor --help
@@ -421,8 +436,6 @@ vscode-extension/
 ## 📄 许可证
 
 MIT License - 详见 [LICENSE](../LICENSE)
-
-
 
 ## 📞 支持
 
