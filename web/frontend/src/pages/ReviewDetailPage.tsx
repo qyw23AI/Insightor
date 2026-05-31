@@ -163,18 +163,19 @@ export default function ReviewDetailPage() {
   const sevs = ['critical', 'high', 'medium', 'low', 'info'];
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="p-6 max-w-5xl mx-auto space-y-5">
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
-          <button onClick={() => navigate('/dashboard')} className="btn-ghost text-sm mb-2">
-            &larr; Back
+          <button onClick={() => navigate('/dashboard')} className="btn-ghost btn-sm mb-2 -ml-1">
+            ← Back
           </button>
-          <h1 className="text-xl font-semibold text-ink tracking-tight">
+          <h1 className="text-lg font-semibold text-ink tracking-tight">
             #{meta?.pr_url ? (meta.pr_url as string).split('/').pop() : id?.slice(0, 8)}
           </h1>
-          <p className="text-base text-muted mt-1">
-            {meta?.model as string} &middot; {meta?.analysis_depth as string} &middot; {meta?.duration_ms ? `${(meta.duration_ms as number / 1000).toFixed(0)}s` : ''}
+          <p className="text-xs text-muted mt-0.5">
+            {meta?.model as string} &middot; {meta?.analysis_depth as string}
+            {meta?.duration_ms ? ` · ${((meta.duration_ms as number) / 1000).toFixed(0)}s` : ''}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -182,9 +183,7 @@ export default function ReviewDetailPage() {
             <ScoreGauge score={mr.score as number} recommendation={(mr.recommendation as string) || ''} />
           )}
           {published ? (
-            <span className="badge badge-success text-xs">
-              Published
-            </span>
+            <span className="badge badge-success">Published</span>
           ) : (
             <button onClick={handlePublish} disabled={publishing} className="btn-primary">
               {publishing ? 'Publishing...' : 'Publish to GitHub'}
@@ -195,25 +194,22 @@ export default function ReviewDetailPage() {
 
       {/* Summary card */}
       {summary && (
-        <div className="card">
-          <h3 className="font-semibold text-ink text-base mb-2">Summary</h3>
-          <p className="text-base text-muted leading-relaxed">{summary.overview as string}</p>
-          <div className="flex items-center gap-3 mt-3 text-sm text-faint">
-            <span>{summary.pr_type as string}</span>
-            <span>&middot;</span>
-            <span>{summary.files_changed as number} files (+{summary.additions as number} / -{summary.deletions as number})</span>
+        <div className="card space-y-2">
+          <div className="flex items-baseline justify-between gap-4 flex-wrap">
+            <h3 className="text-sm font-semibold text-ink">{summary.pr_type as string}</h3>
+            <span className="text-xs text-faint tabular-nums">
+              {summary.files_changed as number} files &nbsp;+{summary.additions as number} / -{summary.deletions as number}
+            </span>
           </div>
+          <p className="text-xs text-muted leading-relaxed">{summary.overview as string}</p>
 
-          {/* File walkthrough */}
           {fileWalkthrough.length > 0 && (
-            <div className="mt-3 pt-3 border-t border-border">
-              <h4 className="text-sm font-medium text-muted mb-2">
-                Changed files ({fileWalkthrough.length})
-              </h4>
-              <div className="space-y-1 max-h-64 overflow-y-auto">
+            <div className="mt-1.5 pt-2.5 border-t border-border">
+              <p className="text-xs font-medium text-muted mb-1.5">Changed files ({fileWalkthrough.length})</p>
+              <div className="space-y-0.5 max-h-52 overflow-y-auto">
                 {fileWalkthrough.map((fw, i) => (
-                  <div key={i} className="flex items-start gap-2 text-sm group hover:bg-app-surface-elevated rounded-md px-1.5 py-1 -mx-1.5 transition-colors">
-                    <span className={`mt-0.5 w-4 text-center flex-shrink-0 font-mono text-xs ${
+                  <div key={i} className="flex items-center gap-2 text-xs group hover:bg-app-surface-elevated rounded px-1.5 py-0.5 -mx-1.5 transition-colors">
+                    <span className={`w-3 text-center flex-shrink-0 font-mono ${
                       fw.edit_type === 'added' ? 'text-success' :
                       fw.edit_type === 'deleted' ? 'text-error' :
                       fw.edit_type === 'renamed' ? 'text-warning' :
@@ -221,9 +217,9 @@ export default function ReviewDetailPage() {
                     }`}>
                       {fw.edit_type === 'added' ? '+' : fw.edit_type === 'deleted' ? '−' : fw.edit_type === 'renamed' ? '↻' : '~'}
                     </span>
-                    <code className="text-muted flex-1 min-w-0 truncate text-xs">{fw.path}</code>
+                    <code className="text-muted flex-1 min-w-0 truncate text-[11px]">{fw.path}</code>
                     {fw.summary && (
-                      <span className="text-faint flex-shrink-0 hidden lg:inline truncate max-w-[240px] text-xs">{fw.summary}</span>
+                      <span className="text-faint flex-shrink-0 hidden lg:inline truncate max-w-[220px] text-[11px]">{fw.summary}</span>
                     )}
                   </div>
                 ))}
@@ -233,22 +229,22 @@ export default function ReviewDetailPage() {
         </div>
       )}
 
-      {/* Tabs: Findings / Diff */}
-      <div className="flex border-b border-border gap-6">
-        <button className={`tab ${tab === 'findings' ? 'active' : ''}`} onClick={() => setTab('findings')}>
+      {/* Tabs */}
+      <div className="flex border-b border-border">
+        <button className={`tab${tab === 'findings' ? ' active' : ''}`} onClick={() => setTab('findings')}>
           Findings ({findings.length})
         </button>
-        <button className={`tab ${tab === 'diff' ? 'active' : ''}`} onClick={() => setTab('diff')}>
+        <button className={`tab${tab === 'diff' ? ' active' : ''}`} onClick={() => setTab('diff')}>
           Diff view
         </button>
       </div>
 
       {/* Severity filter */}
       {tab === 'findings' && (
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-1.5 flex-wrap">
           <button
             onClick={() => setSeverityFilter('all')}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 ${
+            className={`px-2.5 py-1 rounded text-xs font-medium transition-all duration-100 ${
               severityFilter === 'all'
                 ? 'bg-primary text-white'
                 : 'bg-app-surface text-muted hover:text-ink hover:bg-app-surface-elevated'
@@ -263,7 +259,7 @@ export default function ReviewDetailPage() {
               <button
                 key={s}
                 onClick={() => setSeverityFilter(s)}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 capitalize ${
+                className={`px-2.5 py-1 rounded text-xs font-medium transition-all duration-100 capitalize ${
                   severityFilter === s
                     ? 'bg-primary text-white'
                     : 'bg-app-surface text-muted hover:text-ink hover:bg-app-surface-elevated'

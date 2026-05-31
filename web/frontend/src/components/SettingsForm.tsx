@@ -55,42 +55,42 @@ export default function SettingsForm() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* API Keys */}
-      <div className="card space-y-4">
-        <h2 className="text-base font-semibold text-ink">API keys & tokens</h2>
-        <p className="text-sm text-muted">Your credentials are encrypted before storage.</p>
+      <div className="card space-y-3">
+        <div className="mb-1">
+          <h2 className="text-sm font-semibold text-ink">API keys &amp; tokens</h2>
+          <p className="text-xs text-muted mt-0.5">Credentials are encrypted before storage.</p>
+        </div>
         {CONFIG_FIELDS.map(field => (
           <div key={field.key}>
-            <label className="block text-sm font-medium text-muted mb-1.5">{field.label}</label>
-            <div className="relative">
-              <input
-                type="password"
-                placeholder={masked[field.key] || field.placeholder}
-                value={configs[field.key] || ''}
-                onChange={e => handleChange(field.key, e.target.value)}
-                className="input font-mono text-sm"
-              />
-              {masked[field.key] && !configs[field.key] && (
-                <p className="text-xs text-faint mt-1">Current: {masked[field.key]}</p>
-              )}
-            </div>
+            <label className="block text-xs font-medium text-muted mb-1.5">{field.label}</label>
+            <input
+              type="password"
+              placeholder={masked[field.key] || field.placeholder}
+              value={configs[field.key] || ''}
+              onChange={e => handleChange(field.key, e.target.value)}
+              className="input font-mono text-xs"
+            />
+            {masked[field.key] && !configs[field.key] && (
+              <p className="text-[11px] text-faint mt-1 font-mono">Set: {masked[field.key]}</p>
+            )}
           </div>
         ))}
       </div>
 
       {/* Model config */}
-      <div className="card space-y-4">
-        <h2 className="text-base font-semibold text-ink">Model configuration</h2>
+      <div className="card space-y-3">
+        <h2 className="text-sm font-semibold text-ink mb-1">Model configuration</h2>
         {MODEL_FIELDS.map(field => (
           <div key={field.key}>
-            <label className="block text-sm font-medium text-muted mb-1.5">{field.label}</label>
+            <label className="block text-xs font-medium text-muted mb-1.5">{field.label}</label>
             <input
               type="text"
               placeholder={field.placeholder}
               value={configs[field.key] || ''}
               onChange={e => handleChange(field.key, e.target.value)}
-              className="input font-mono text-sm"
+              className="input font-mono text-xs"
             />
           </div>
         ))}
@@ -101,7 +101,7 @@ export default function SettingsForm() {
           {saving ? 'Saving...' : 'Save configuration'}
         </button>
         {message && (
-          <span className={`text-sm ${message.startsWith('Error') ? 'text-error' : 'text-success'}`}>
+          <span className={`text-xs ${message.startsWith('Error') ? 'text-error' : 'text-success'}`}>
             {message}
           </span>
         )}
